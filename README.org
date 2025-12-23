@@ -1,0 +1,3 @@
+#+begin_quote
+It's a great operating system, lacking only a decent editor
+#+end_quote
