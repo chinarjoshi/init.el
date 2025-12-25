@@ -167,6 +167,57 @@
           (message "Captured to %s" selected))
       (find-file file))))
 
+;; Piece tags
+(defun pieces--name-to-tag (filename)
+  "Convert '3_The Big Fight.org' to 'TheBigFight'."
+  (let* ((base (file-name-sans-extension (file-name-nondirectory filename)))
+         (name (if (string-match "^[0-9]+_\\(.*\\)" base)
+                   (match-string 1 base)
+                 base)))
+    (replace-regexp-in-string " " "" name)))
+
+(defun pieces--tag-to-file (tag)
+  "Find file matching tag 'TheBigFight'."
+  (let ((files (directory-files-recursively pieces-directory "\\.org$")))
+    (seq-find (lambda (f) (string= tag (pieces--name-to-tag f))) files)))
+
+(defun pieces--all-tags ()
+  "Get all piece tags."
+  (let ((files (directory-files-recursively pieces-directory "\\.org$")))
+    (mapcar #'pieces--name-to-tag files)))
+
+(defun pieces-update-tags ()
+  "Update org-tag-alist with piece tags."
+  (interactive)
+  (setq org-tag-alist
+        (mapcar (lambda (tag) (cons tag ?p)) (pieces--all-tags)))
+  (message "Updated %d piece tags" (length org-tag-alist)))
+
+(defun pieces-goto-tag-at-point ()
+  "Jump to piece file for tag at point."
+  (interactive)
+  (let* ((tag (org-get-tags nil t))
+         (piece-tags (pieces--all-tags))
+         (found (seq-find (lambda (t) (member t piece-tags)) tag)))
+    (if found
+        (find-file (pieces--tag-to-file found))
+      (message "No piece tag at point"))))
+
+(defun pieces-show-backlinks ()
+  "Show all daily entries tagged with current piece."
+  (interactive)
+  (let* ((tag (pieces--name-to-tag buffer-file-name))
+         (daily-dir (expand-file-name "daily" notes-directory)))
+    (consult-ripgrep daily-dir (format ":%s:" tag))))
+
+;; Auto-update tags when entering org-mode in notes
+(add-hook 'org-mode-hook
+          (lambda ()
+            (when (and buffer-file-name
+                       (string-prefix-p (expand-file-name notes-directory)
+                                        (expand-file-name buffer-file-name)))
+              (pieces-update-tags))))
+
 (use-package org-modern
   :ensure t
   :hook (org-mode . org-modern-mode))
@@ -378,6 +429,12 @@
     ;; Quit
     "q" '(:ignore t :which-key "quit")
     "qq" '(save-buffers-kill-terminal :which-key "quit")
+
+    ;; Pieces navigation
+    "p" '(:ignore t :which-key "piece")
+    "pp" '(pieces-goto-tag-at-point :which-key "goto tag")
+    "pb" '(pieces-show-backlinks :which-key "backlinks")
+    "pt" '(org-set-tags-command :which-key "set tags")
 
     ;; Pieces (Acts 1-9, Pieces 1-9)
     "1" '(:ignore t :which-key "Act 1")
