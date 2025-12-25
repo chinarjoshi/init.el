@@ -16,11 +16,6 @@
         (vertical-scroll-bars)
         (undecorated . t)
         (font . "Inconsolata Nerd Font-13")))
-(setq initial-frame-alist default-frame-alist)
-
-;; Set face background before frame creation
-(set-face-background 'default "#000000")
-(set-face-foreground 'default "#ffffff")
 
 ;; Disable mode-line early
 (setq-default mode-line-format nil)
@@ -28,7 +23,7 @@
 ;; No startup screens
 (setq inhibit-startup-screen t)
 (setq inhibit-startup-message t)
-(setq inhibit-startup-echo-area-message user-login-name)
+(setq inhibit-startup-echo-area-message "c")
 (setq initial-scratch-message nil)
 
 ;; No warnings from native comp

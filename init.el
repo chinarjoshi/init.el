@@ -7,19 +7,39 @@
 (unless package-archive-contents
   (package-refresh-contents))
 
+;;; Backups and autosave
+(setq make-backup-files nil)
+(setq auto-save-default nil)
+(setq create-lockfiles nil)
+
+;;; Use y/n instead of yes/no
+(setq use-short-answers t)
+
+;;; Don't prompt about unsaved buffers on quit
+(setq confirm-kill-processes nil)
+(advice-add 'save-buffers-kill-terminal :before
+            (lambda (&rest _)
+              (dolist (buf (buffer-list))
+                (with-current-buffer buf
+                  (set-buffer-modified-p nil)))))
+
 ;;; UI
-(global-display-line-numbers-mode 1)
+(add-hook 'prog-mode-hook 'display-line-numbers-mode)
 
 (setq modus-themes-common-palette-overrides
-      '((bg-main "#000000")))
+      '((bg-main "#000000")
+        (bg-dim "#0a0a0a")
+        (bg-alt "#0a0a0a")))
 (load-theme 'modus-vivendi t)
 (set-face-attribute 'fringe nil :background "#000000")
+(set-face-attribute 'line-number nil :background "#000000")
+(set-face-attribute 'line-number-current-line nil :background "#000000")
 
 ;;; Fonts
 (defun my/set-fonts ()
   (set-face-attribute 'default nil :family "Inconsolata Nerd Font" :height 130)
   (set-face-attribute 'fixed-pitch nil :family "Inconsolata Nerd Font")
-  (set-face-attribute 'variable-pitch nil :family "Garamond"))
+  (set-face-attribute 'variable-pitch nil :family "Lora"))
 
 (if (daemonp)
     (add-hook 'after-make-frame-functions
@@ -30,6 +50,15 @@
 
 ;;; Org
 (add-hook 'org-mode-hook 'variable-pitch-mode)
+(add-hook 'org-mode-hook 'auto-save-mode)
+(custom-set-faces
+ '(org-block ((t (:inherit fixed-pitch))))
+ '(org-code ((t (:inherit fixed-pitch))))
+ '(org-verbatim ((t (:inherit fixed-pitch))))
+ '(org-table ((t (:inherit fixed-pitch))))
+ '(org-meta-line ((t (:inherit fixed-pitch))))
+ '(org-block-begin-line ((t (:inherit fixed-pitch))))
+ '(org-block-end-line ((t (:inherit fixed-pitch)))))
 
 ;; Periodic notes (like Obsidian)
 (defvar notes-directory "~/notes")
@@ -254,18 +283,13 @@
   (setq org-appear-autolinks t)
   (setq org-appear-autosubmarkers t))
 
+
 (use-package olivetti
   :ensure t
   :hook (org-mode . olivetti-mode)
   :config
-  (setq olivetti-body-width 80))
-
-(use-package visual-fill-column
-  :ensure t
-  :hook (org-mode . visual-fill-column-mode)
-  :config
-  (setq visual-fill-column-width 80)
-  (setq visual-fill-column-center-text t))
+  (setq olivetti-body-width 100)
+  (set-face-attribute 'olivetti-fringe nil :background "#000000"))
 
 (use-package org-fragtog
   :ensure t
@@ -386,21 +410,12 @@
   :config
   (vertico-mode 1))
 
-(use-package vertico-posframe
-  :ensure t
-  :after vertico
-  :config
-  (setq vertico-posframe-parameters
-        '((left-fringe . 8)
-          (right-fringe . 8)))
-  (setq vertico-posframe-border-width 2)
-  (setq vertico-posframe-width 100)
-  (vertico-posframe-mode 1))
-
 (use-package orderless
   :ensure t
   :config
-  (setq completion-styles '(orderless basic)))
+  (setq completion-styles '(orderless basic))
+  (setq completion-category-overrides nil)
+  (setq completion-category-defaults nil))
 
 (use-package marginalia
   :ensure t
@@ -695,7 +710,7 @@
 (use-package treesit-auto
   :ensure t
   :config
-  (setq treesit-auto-install t)
+  (setq treesit-auto-install 'prompt)
   (global-treesit-auto-mode 1))
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
