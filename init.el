@@ -1,5 +1,12 @@
 ;;; init.el --- Minimal Emacs config -*- lexical-binding: t -*-
 
+;;; Package setup
+(require 'package)
+(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+(package-initialize)
+(unless package-archive-contents
+  (package-refresh-contents))
+
 ;;; UI
 (menu-bar-mode -1)
 (tool-bar-mode -1)
@@ -7,10 +14,17 @@
 (setq-default mode-line-format nil)
 (global-display-line-numbers-mode 1)
 
+(use-package doom-themes
+  :ensure t
+  :config
+  (load-theme 'doom-one t))
+
 ;;; Fonts
 (set-face-attribute 'default nil :family "Inconsolata" :height 120)
 (set-face-attribute 'fixed-pitch nil :family "Inconsolata")
 (set-face-attribute 'variable-pitch nil :family "Garamond")
+
+(add-hook 'prog-mode-hook 'fixed-pitch-mode)
 
 ;;; Org
 (add-hook 'org-mode-hook 'variable-pitch-mode)
@@ -34,9 +48,15 @@
 
 (defun notes-open-daily ()
   (interactive)
-  (let ((file (notes--daily-file (current-time))))
+  (let* ((time (current-time))
+         (file (notes--daily-file time))
+         (day-name (format-time-string "%A" time))
+         (new-file (not (file-exists-p file))))
     (notes--ensure-dir file)
-    (find-file file)))
+    (find-file file)
+    (when (and new-file (= (buffer-size) 0))
+      (insert (format "* :%s:\n" day-name))
+      (save-buffer))))
 
 (defun notes-open-weekly ()
   (interactive)
@@ -149,7 +169,9 @@
       (make-directory dir t))))
 
 (defun pieces--make-binding (act piece)
-  (lambda () (interactive) (pieces-open-or-capture act piece)))
+  (let ((fn (lambda () (interactive) (pieces-open-or-capture act piece))))
+    (defalias (intern (format "pieces-open-%d-%d" act piece)) fn)
+    (intern (format "pieces-open-%d-%d" act piece))))
 
 (defun pieces-search ()
   (interactive)
@@ -249,7 +271,12 @@
 
 (use-package org-transclusion
   :ensure t
-  :after org)
+  :after org
+  :config
+  (set-face-attribute 'org-transclusion-fringe nil :foreground "dim gray")
+  (set-face-attribute 'org-transclusion nil
+                      :background nil
+                      :foreground "gray60"))
 
 ;; Auto-transclusion for periodic notes
 (defun notes--week-days (week-num year)
@@ -278,6 +305,14 @@
           (push (1+ week) weeks))))
     (nreverse weeks)))
 
+(defun notes--get-first-heading (file)
+  "Get the first heading text from FILE for transclusion target."
+  (with-temp-buffer
+    (insert-file-contents file)
+    (goto-char (point-min))
+    (when (re-search-forward "^\\*+[ \t]+\\(.*\\)$" nil t)
+      (match-string 1))))
+
 (defun notes--update-transclusions ()
   "Update transclusion links in weekly/monthly notes."
   (when buffer-file-name
@@ -285,7 +320,7 @@
            (dir (file-name-nondirectory (directory-file-name (file-name-directory buffer-file-name))))
            (year (string-to-number (format-time-string "%Y"))))
       (cond
-       ;; Weekly note - transclude daily notes
+       ;; Weekly note - transclude daily notes (first heading only)
        ((string= dir "weekly")
         (let* ((week-num (string-to-number name))
                (days (notes--week-days week-num year))
@@ -294,9 +329,11 @@
           (dolist (day days)
             (let ((file (expand-file-name (format "%02d-%02d.org" (car day) (cdr day)) daily-dir)))
               (when (file-exists-p file)
-                (push (format "#+transclude: [[file:%s]] :level 2" file) links))))
+                (let ((heading (notes--get-first-heading file)))
+                  (when heading
+                    (push (format "#+transclude: [[file:%s::*%s]]" file heading) links))))))
           (notes--replace-transclusions (nreverse links))))
-       ;; Monthly note - transclude weekly notes
+       ;; Monthly note - transclude weekly notes (first heading only)
        ((string= dir "monthly")
         (let* ((weeks (notes--month-weeks name year))
                (weekly-dir (expand-file-name "weekly" notes-directory))
@@ -304,7 +341,9 @@
           (dolist (week weeks)
             (let ((file (expand-file-name (format "%02d.org" week) weekly-dir)))
               (when (file-exists-p file)
-                (push (format "#+transclude: [[file:%s]] :level 2" file) links))))
+                (let ((heading (notes--get-first-heading file)))
+                  (when heading
+                    (push (format "#+transclude: [[file:%s::*%s]]" file heading) links))))))
           (notes--replace-transclusions (nreverse links))))))))
 
 (defun notes--replace-transclusions (links)
@@ -328,19 +367,16 @@
     (insert "# END TRANSCLUSIONS\n")
     (save-buffer)))
 
+(defun notes--periodic-note-p ()
+  (when buffer-file-name
+    (let ((dir (file-name-nondirectory (directory-file-name (file-name-directory buffer-file-name)))))
+      (member dir '("weekly" "monthly")))))
+
 (add-hook 'find-file-hook
           (lambda ()
-            (when (and buffer-file-name
-                       (string-suffix-p ".org" buffer-file-name)
-                       (string-prefix-p (expand-file-name notes-directory)
-                                        (expand-file-name buffer-file-name)))
+            (when (notes--periodic-note-p)
               (notes--update-transclusions)
               (org-transclusion-mode 1))))
-
-;;; Package setup
-(require 'package)
-(add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
-(package-initialize)
 
 ;;; Completion (minibuffer)
 (use-package vertico
@@ -408,18 +444,7 @@
   (setq evil-want-keybinding nil)
   (setq evil-undo-system 'undo-redo)
   :config
-  (evil-mode 1)
-  (evil-set-initial-state 'org-mode 'emacs))
-
-(defun toggle-evil-mode ()
-  "Toggle between evil and emacs state."
-  (interactive)
-  (if (eq evil-state 'emacs)
-      (evil-normal-state)
-    (evil-emacs-state)))
-
-;; Works in both evil and emacs states
-(global-set-key (kbd "C-c v") 'toggle-evil-mode)
+  (evil-mode 1))
 
 (use-package evil-collection
   :ensure t
@@ -469,6 +494,7 @@
 (use-package which-key
   :ensure t
   :config
+  (setq which-key-idle-delay 0)
   (which-key-mode 1))
 
 ;;; General (leader key)
@@ -484,8 +510,8 @@
   (leader-def
     "" '(nil :which-key "leader")
     "SPC" '(pieces-search :which-key "pieces")
-    "." '(find-file :which-key "find file")
-    "," '(switch-to-buffer :which-key "switch buffer")
+    "." '(consult-fd :which-key "find file")
+    "," '(consult-buffer :which-key "switch buffer")
     ";" '(execute-extended-command :which-key "M-x")
     "x" '(scratch-buffer :which-key "scratch")
 
@@ -498,6 +524,7 @@
     ;; File
     "f" '(:ignore t :which-key "file")
     "ff" '(find-file :which-key "find")
+    "fd" '(consult-fd :which-key "fd")
     "fs" '(save-buffer :which-key "save")
     "fr" '(consult-recent-file :which-key "recent")
 
@@ -531,9 +558,8 @@
     "q" '(:ignore t :which-key "quit")
     "qq" '(save-buffers-kill-terminal :which-key "quit")
 
-    ;; Toggle
-    "t" '(:ignore t :which-key "toggle")
-    "tv" '(toggle-evil-mode :which-key "evil mode")
+    ;; Theme
+    "T" '(consult-theme :which-key "theme")
 
     ;; Pieces navigation
     "p" '(:ignore t :which-key "piece")
