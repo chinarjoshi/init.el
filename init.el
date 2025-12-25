@@ -247,6 +247,96 @@
   :ensure t
   :hook (org-mode . org-fragtog-mode))
 
+(use-package org-transclusion
+  :ensure t
+  :after org)
+
+;; Auto-transclusion for periodic notes
+(defun notes--week-days (week-num year)
+  "Return list of (month day) pairs for a given ISO week."
+  (let* ((jan4 (encode-time 0 0 0 4 1 year))
+         (jan4-dow (string-to-number (format-time-string "%u" jan4)))
+         (week1-mon (time-subtract jan4 (days-to-time (1- jan4-dow))))
+         (week-mon (time-add week1-mon (days-to-time (* 7 (1- week-num)))))
+         (days '()))
+    (dotimes (i 7)
+      (let ((day (time-add week-mon (days-to-time i))))
+        (push (cons (string-to-number (format-time-string "%m" day))
+                    (string-to-number (format-time-string "%d" day)))
+              days)))
+    (nreverse days)))
+
+(defun notes--month-weeks (month-name year)
+  "Return list of week numbers that have days in the given month."
+  (let* ((months '("January" "February" "March" "April" "May" "June"
+                   "July" "August" "September" "October" "November" "December"))
+         (month-num (1+ (seq-position months month-name #'string=)))
+         (weeks '()))
+    (dotimes (week 53)
+      (let ((days (notes--week-days (1+ week) year)))
+        (when (seq-find (lambda (d) (= (car d) month-num)) days)
+          (push (1+ week) weeks))))
+    (nreverse weeks)))
+
+(defun notes--update-transclusions ()
+  "Update transclusion links in weekly/monthly notes."
+  (when buffer-file-name
+    (let* ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
+           (dir (file-name-nondirectory (directory-file-name (file-name-directory buffer-file-name))))
+           (year (string-to-number (format-time-string "%Y"))))
+      (cond
+       ;; Weekly note - transclude daily notes
+       ((string= dir "weekly")
+        (let* ((week-num (string-to-number name))
+               (days (notes--week-days week-num year))
+               (daily-dir (expand-file-name "daily" notes-directory))
+               (links '()))
+          (dolist (day days)
+            (let ((file (expand-file-name (format "%02d-%02d.org" (car day) (cdr day)) daily-dir)))
+              (when (file-exists-p file)
+                (push (format "#+transclude: [[file:%s]] :level 2" file) links))))
+          (notes--replace-transclusions (nreverse links))))
+       ;; Monthly note - transclude weekly notes
+       ((string= dir "monthly")
+        (let* ((weeks (notes--month-weeks name year))
+               (weekly-dir (expand-file-name "weekly" notes-directory))
+               (links '()))
+          (dolist (week weeks)
+            (let ((file (expand-file-name (format "%02d.org" week) weekly-dir)))
+              (when (file-exists-p file)
+                (push (format "#+transclude: [[file:%s]] :level 2" file) links))))
+          (notes--replace-transclusions (nreverse links))))))))
+
+(defun notes--replace-transclusions (links)
+  "Replace transclusion block in current buffer."
+  (save-excursion
+    (goto-char (point-min))
+    (let ((start (if (re-search-forward "^# BEGIN TRANSCLUSIONS$" nil t)
+                     (line-beginning-position)
+                   nil))
+          (end (if (re-search-forward "^# END TRANSCLUSIONS$" nil t)
+                   (line-end-position)
+                 nil)))
+      (if (and start end)
+          (delete-region start (1+ end))
+        (goto-char (point-max))))
+    (goto-char (point-max))
+    (unless (bolp) (insert "\n"))
+    (insert "# BEGIN TRANSCLUSIONS\n")
+    (dolist (link links)
+      (insert link "\n"))
+    (insert "# END TRANSCLUSIONS\n")
+    (save-buffer)))
+
+(add-hook 'find-file-hook
+          (lambda ()
+            (when (and buffer-file-name
+                       (string-suffix-p ".org" buffer-file-name)
+                       (string-prefix-p (expand-file-name notes-directory)
+                                        (expand-file-name buffer-file-name)))
+              (notes--update-transclusions)
+              (org-transclusion-mode 1))))
+
 ;;; Package setup
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
