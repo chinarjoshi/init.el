@@ -1,3 +1,106 @@
+#+title: 10-24
+
+
 #+begin_quote
-It's a great operating system, lacking only a decent editor
+/ It's a great operating system, lacking only a decent editor
 #+end_quote
+
+
+
+* Emacs keybindings
+
+C-g/ESCESCESC universal escape
+C-npfbae. Not bad actually
+M-bfae. Same as you knew from bash
+C-k kill to end of line
+M-k kill sentence (spans multiple lines)
+C-/ undo
+C-? redo
+C-sr forward/backward search
+C-d deletes character after point
+M-d deletes word after point
+M-DEL delete word before cursor
+M-<> Start and end of the file
+C-SPC starts the mark, then C-w kills, M-w kills without deleting
+C-y yanks into the page
+
+
+* Org concepts and keybindings
+Three things matter here
+  1. Reordering structure
+  2. Placing items in time
+  3. Making forward progress
+     
+** Headings and navigation
+
+You treat a heading level as a subtree
+
+** Keybinidngs
+
+*** TAB or S-TAB
+Toggle visibility of the current subtree if you're on a header, or all headings
+
+**** asldkjf
+
+*** M-RET
+creates a new heading same level at the point
+
+*** C-RET
+creates a new heading same level after this tree (sibling)
+
+*** M-UP/DOWN
+Move the heading subtree up or down (visualize the underlying graph)
+
+*** M-LEFT/RIGHT
+Promotes or demotes a heading level. Ok wait I lowkey love emacs keybindings
+
+*** C-c C-n/p
+Go to next/prev node
+
+*** C-c C-b/f
+Go to next/prev sibling
+
+*** C-c C-u
+Up a level
+
+*** C-LEFT/RIGHT
+*** C-c C-t
+toggle todo state (NONE, TODO, DONE)
+
+*** C-c C-,
+insert a template
+
+*** C-c C-c                                                           :table:
+Apply an attribute/tag
+
+*** C-c C-s/d
+Apply a schedule or deadline
+
+*** C-c C-l/o
+:LOGBOOK:
+CLOCK: [2025-12-23 Tue 20:45]--[2025-12-23 Tue 20:47] =>  0:02
+:END:
+insert a link, follow a link[[https://github.com/chinarjoshi][chinarjoshi]]
+
+ - list item
+ - M-RET creates new item if in list
+ - [X] M-arrow behaves as expected
+ - C-c C-c toggles a checkbox list
+ - 
+
+** Tables
+Just type a | asdasdf | asdfasdf | asdfasdf |
+You can also C-c | to turn it into a list. Then TAB S-TAB to navigate from there
+|---+---+---+---+---|
+|   |   |   |   |   |
+|   |   |   |   |   |
+
+** Code blocks
+
+#+begin_src python
+  import asdf
+  for i in range(10):
+      print(10)
+#+end_src
+
+Use C-c C-c to evaluate it. C-c ' to edit in a different buffer.
