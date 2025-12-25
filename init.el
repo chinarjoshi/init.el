@@ -408,7 +408,18 @@
   (setq evil-want-keybinding nil)
   (setq evil-undo-system 'undo-redo)
   :config
-  (evil-mode 1))
+  (evil-mode 1)
+  (evil-set-initial-state 'org-mode 'emacs))
+
+(defun toggle-evil-mode ()
+  "Toggle between evil and emacs state."
+  (interactive)
+  (if (eq evil-state 'emacs)
+      (evil-normal-state)
+    (evil-emacs-state)))
+
+;; Works in both evil and emacs states
+(global-set-key (kbd "C-c v") 'toggle-evil-mode)
 
 (use-package evil-collection
   :ensure t
@@ -519,6 +530,10 @@
     ;; Quit
     "q" '(:ignore t :which-key "quit")
     "qq" '(save-buffers-kill-terminal :which-key "quit")
+
+    ;; Toggle
+    "t" '(:ignore t :which-key "toggle")
+    "tv" '(toggle-evil-mode :which-key "evil mode")
 
     ;; Pieces navigation
     "p" '(:ignore t :which-key "piece")
