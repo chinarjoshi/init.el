@@ -8,10 +8,6 @@
   (package-refresh-contents))
 
 ;;; UI
-(menu-bar-mode -1)
-(tool-bar-mode -1)
-(scroll-bar-mode -1)
-(setq-default mode-line-format nil)
 (global-display-line-numbers-mode 1)
 
 (use-package doom-themes
@@ -23,8 +19,6 @@
 (set-face-attribute 'default nil :family "Inconsolata" :height 120)
 (set-face-attribute 'fixed-pitch nil :family "Inconsolata")
 (set-face-attribute 'variable-pitch nil :family "Garamond")
-
-(add-hook 'prog-mode-hook 'fixed-pitch-mode)
 
 ;;; Org
 (add-hook 'org-mode-hook 'variable-pitch-mode)
@@ -403,6 +397,24 @@
 (use-package avy
   :ensure t)
 
+(use-package all-the-icons
+  :ensure t)
+
+(use-package dirvish
+  :ensure t
+  :after all-the-icons
+  :init
+  (dirvish-override-dired-mode)
+  :config
+  (setq dirvish-attributes '(all-the-icons file-size collapse subtree-state vc-state git-msg))
+  (setq dirvish-mode-line-format '(:left (sort symlink) :right (omit yank index)))
+  (setq dirvish-side-width 35)
+  :bind
+  (:map dirvish-mode-map
+        ("a" . dirvish-quick-access)
+        ("TAB" . dirvish-subtree-toggle)
+        ("q" . dirvish-quit)))
+
 (use-package vi-tilde-fringe
   :ensure t
   :hook (prog-mode . vi-tilde-fringe-mode))
@@ -527,6 +539,8 @@
     "fd" '(consult-fd :which-key "fd")
     "fs" '(save-buffer :which-key "save")
     "fr" '(consult-recent-file :which-key "recent")
+    "fe" '(dirvish :which-key "dirvish")
+    "ft" '(dirvish-side :which-key "sidebar")
 
     ;; Search
     "s" '(:ignore t :which-key "search")
