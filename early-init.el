@@ -7,13 +7,20 @@
 ;; Disable package.el (we use use-package with :ensure)
 (setq package-enable-at-startup nil)
 
-;; Prevent UI flash before init.el disables them
-(push '(menu-bar-lines . 0) default-frame-alist)
-(push '(tool-bar-lines . 0) default-frame-alist)
-(push '(vertical-scroll-bars) default-frame-alist)
+;; Set default frame parameters immediately (prevents white flash)
+(setq default-frame-alist
+      '((background-color . "#000000")
+        (foreground-color . "#ffffff")
+        (menu-bar-lines . 0)
+        (tool-bar-lines . 0)
+        (vertical-scroll-bars)
+        (undecorated . t)
+        (font . "Inconsolata Nerd Font-13")))
+(setq initial-frame-alist default-frame-alist)
 
-;; No title bar
-(push '(undecorated . t) default-frame-alist)
+;; Set face background before frame creation
+(set-face-background 'default "#000000")
+(set-face-foreground 'default "#ffffff")
 
 ;; Disable mode-line early
 (setq-default mode-line-format nil)

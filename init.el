@@ -10,15 +10,23 @@
 ;;; UI
 (global-display-line-numbers-mode 1)
 
-(use-package doom-themes
-  :ensure t
-  :config
-  (load-theme 'doom-one t))
+(setq modus-themes-common-palette-overrides
+      '((bg-main "#000000")))
+(load-theme 'modus-vivendi t)
+(set-face-attribute 'fringe nil :background "#000000")
 
 ;;; Fonts
-(set-face-attribute 'default nil :family "Inconsolata" :height 120)
-(set-face-attribute 'fixed-pitch nil :family "Inconsolata")
-(set-face-attribute 'variable-pitch nil :family "Garamond")
+(defun my/set-fonts ()
+  (set-face-attribute 'default nil :family "Inconsolata Nerd Font" :height 130)
+  (set-face-attribute 'fixed-pitch nil :family "Inconsolata Nerd Font")
+  (set-face-attribute 'variable-pitch nil :family "Garamond"))
+
+(if (daemonp)
+    (add-hook 'after-make-frame-functions
+              (lambda (frame)
+                (with-selected-frame frame
+                  (my/set-fonts))))
+  (add-hook 'after-init-hook #'my/set-fonts))
 
 ;;; Org
 (add-hook 'org-mode-hook 'variable-pitch-mode)
@@ -378,6 +386,17 @@
   :config
   (vertico-mode 1))
 
+(use-package vertico-posframe
+  :ensure t
+  :after vertico
+  :config
+  (setq vertico-posframe-parameters
+        '((left-fringe . 8)
+          (right-fringe . 8)))
+  (setq vertico-posframe-border-width 2)
+  (setq vertico-posframe-width 100)
+  (vertico-posframe-mode 1))
+
 (use-package orderless
   :ensure t
   :config
@@ -391,22 +410,24 @@
 (use-package consult
   :ensure t
   :bind (("C-s" . consult-line)
-         ("C-x b" . consult-buffer)))
+         ("C-x b" . consult-buffer))
+  :config
+  (setq consult-preview-key "any"))
 
 ;;; Navigation
 (use-package avy
   :ensure t)
 
-(use-package all-the-icons
+(use-package nerd-icons
   :ensure t)
 
 (use-package dirvish
   :ensure t
-  :after all-the-icons
+  :after nerd-icons
   :init
   (dirvish-override-dired-mode)
   :config
-  (setq dirvish-attributes '(all-the-icons file-size collapse subtree-state vc-state git-msg))
+  (setq dirvish-attributes '(nerd-icons file-size collapse subtree-state vc-state git-msg))
   (setq dirvish-mode-line-format '(:left (sort symlink) :right (omit yank index)))
   (setq dirvish-side-width 35)
   :bind
@@ -424,16 +445,15 @@
   :ensure t
   :config
   (setq corfu-auto t)
-  (setq corfu-auto-delay 0)
-  (setq corfu-auto-prefix 1)
-  (global-corfu-mode 1))
+  (setq corfu-auto-delay 0.2)
+  (setq corfu-auto-prefix 3)
+  (global-corfu-mode 1)
+  (add-hook 'org-mode-hook (lambda () (corfu-mode -1))))
 
 (use-package cape
   :ensure t
   :init
-  (add-to-list 'completion-at-point-functions #'cape-dabbrev)
-  (add-to-list 'completion-at-point-functions #'cape-file)
-  (add-to-list 'completion-at-point-functions #'cape-keyword))
+  (add-to-list 'completion-at-point-functions #'cape-file))
 
 ;;; Wayland clipboard
 (setq interprogram-cut-function
@@ -595,10 +615,13 @@
   ;; Generate piece bindings for each act
   (dolist (act (number-sequence 1 9))
     (dolist (piece (number-sequence 1 9))
-      (leader-def
-        (format "%d%d" act piece)
-        (list (pieces--make-binding act piece)
-              :which-key (format "piece %d" piece))))))
+      (let ((fn (pieces--make-binding act piece))
+            (key (format "%d%d" act piece)))
+        (general-define-key
+         :states '(normal visual motion)
+         :keymaps 'override
+         :prefix "SPC"
+         key fn)))))
 
 ;;; Magit
 (use-package magit
@@ -672,7 +695,7 @@
 (use-package treesit-auto
   :ensure t
   :config
-  (setq treesit-auto-install 'prompt)
+  (setq treesit-auto-install t)
   (global-treesit-auto-mode 1))
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
