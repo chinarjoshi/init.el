@@ -4,9 +4,36 @@
 /It's a great operating system, lacking only a decent editor/
 #+end_quote
 
-#+toc: headlines
+** Table of Contents :TOC:
+  - [[#setup-melpa][Setup MELPA]]
+- [[#ui][UI]]
+  - [[#basics][Basics]]
+  - [[#ui-1][UI]]
+  - [[#fonts][Fonts]]
+  - [[#clipboard][Clipboard]]
+- [[#writing][Writing]]
+  - [[#org][Org]]
+  - [[#notes][Notes]]
+  - [[#pieces][Pieces]]
+  - [[#org-packages][Org Packages]]
+  - [[#transclusions][Transclusions]]
+- [[#navigation][Navigation]]
+  - [[#completion][Completion]]
+  - [[#navigation-1][Navigation]]
+  - [[#in-buffer-completion][In-buffer Completion]]
+- [[#keybindings][Keybindings]]
+  - [[#evil][Evil]]
+  - [[#which-key][Which-key]]
+  - [[#leader-key][Leader Key]]
+- [[#coding][Coding]]
+  - [[#terminal][Terminal]]
+  - [[#git][Git]]
+  - [[#eglot][Eglot]]
+  - [[#languages][Languages]]
+  - [[#treesitter][Treesitter]]
+  - [[#file-locking][File Locking]]
 
-** Package Setup
+** Setup MELPA
 #+begin_src emacs-lisp
 ;;; config.el --- Emacs config (tangled from README.org) -*- lexical-binding: t -*-
 
@@ -20,6 +47,7 @@
 (setq inhibit-startup-echo-area-message "c")
 #+end_src
 
+* UI
 ** Basics
 #+begin_src emacs-lisp
 ;;; Backups and autosave
@@ -83,6 +111,22 @@
   (add-hook 'after-init-hook #'my/set-fonts))
 #+end_src
 
+** Clipboard
+#+begin_src emacs-lisp
+;;; Wayland clipboard
+(setq interprogram-cut-function
+      (lambda (text)
+        (call-process "wl-copy" nil 0 nil text)))
+
+(setq interprogram-paste-function
+      (lambda ()
+        (when (zerop (call-process "wl-paste" nil nil nil "-n"))
+          (with-temp-buffer
+            (call-process "wl-paste" nil t nil "-n")
+            (buffer-string)))))
+#+end_src
+
+* Writing
 ** Org
 #+begin_src emacs-lisp
 ;;; Org
@@ -330,6 +374,10 @@
 
 ** Org Packages
 #+begin_src emacs-lisp
+(use-package toc-org
+  :ensure t
+  :hook (org-mode . toc-org-mode))
+
 (use-package org-modern
   :ensure t
   :hook (org-mode . org-modern-mode)
@@ -469,6 +517,7 @@
               (org-transclusion-mode 1))))
 #+end_src
 
+* Navigation
 ** Completion
 #+begin_src emacs-lisp
 ;;; Completion (minibuffer)
@@ -552,38 +601,7 @@
   (add-to-list 'completion-at-point-functions #'cape-file))
 #+end_src
 
-** File Locking
-#+begin_src emacs-lisp
-;;; File locking
-(defun toggle-file-lock ()
-  "Toggle write permission on current file."
-  (interactive)
-  (if-let ((file (buffer-file-name)))
-      (let* ((modes (file-modes file))
-             (writable (file-writable-p file)))
-        (if writable
-            (set-file-modes file (logand modes #o555))
-          (set-file-modes file (logior modes #o200)))
-        (revert-buffer t t t)
-        (message "File %s" (if writable "locked" "unlocked")))
-    (message "Buffer has no file")))
-#+end_src
-
-** Clipboard
-#+begin_src emacs-lisp
-;;; Wayland clipboard
-(setq interprogram-cut-function
-      (lambda (text)
-        (call-process "wl-copy" nil 0 nil text)))
-
-(setq interprogram-paste-function
-      (lambda ()
-        (when (zerop (call-process "wl-paste" nil nil nil "-n"))
-          (with-temp-buffer
-            (call-process "wl-paste" nil t nil "-n")
-            (buffer-string)))))
-#+end_src
-
+* Keybindings
 ** Evil
 #+begin_src emacs-lisp
 ;;; Evil
@@ -788,6 +806,7 @@
          key `(,fn :which-key nil))))))
 #+end_src
 
+* Coding
 ** Terminal
 #+begin_src emacs-lisp
 ;;; Terminal
@@ -926,4 +945,21 @@
   :config
   (setq treesit-auto-install 'prompt)
   (global-treesit-auto-mode 1))
+#+end_src
+
+** File Locking
+#+begin_src emacs-lisp
+;;; File locking
+(defun toggle-file-lock ()
+  "Toggle write permission on current file."
+  (interactive)
+  (if-let ((file (buffer-file-name)))
+      (let* ((modes (file-modes file))
+             (writable (file-writable-p file)))
+        (if writable
+            (set-file-modes file (logand modes #o555))
+          (set-file-modes file (logior modes #o200)))
+        (revert-buffer t t t)
+        (message "File %s" (if writable "locked" "unlocked")))
+    (message "Buffer has no file")))
 #+end_src
