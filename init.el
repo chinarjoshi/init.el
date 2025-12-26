@@ -17,6 +17,9 @@
 ;;; Use y/n instead of yes/no
 (setq use-short-answers t)
 
+;;; Show filename instead of key echo
+(setq echo-keystrokes 0)
+
 ;;; Smooth scrolling
 (setq scroll-conservatively 101)
 (setq scroll-margin 2)
@@ -34,14 +37,16 @@
 ;;; UI
 (add-hook 'prog-mode-hook 'display-line-numbers-mode)
 
+;;; No modeline
+(setq-default mode-line-format nil)
+
 (setq modus-themes-common-palette-overrides
       '((bg-main "#000000")
         (bg-dim "#0a0a0a")
         (bg-alt "#0a0a0a")))
 (load-theme 'modus-vivendi t)
-(set-face-attribute 'fringe nil :background "#000000")
-(set-face-attribute 'line-number nil :background "#000000")
-(set-face-attribute 'line-number-current-line nil :background "#000000")
+(dolist (face '(fringe line-number line-number-current-line))
+  (set-face-attribute face nil :background "#000000"))
 (setf (cdr (assq 'continuation fringe-indicator-alist)) '(nil nil))
 (setf (cdr (assq 'truncation fringe-indicator-alist)) '(nil nil))
 
@@ -598,6 +603,48 @@
   :ensure t
   :config
   (setq which-key-idle-delay 0.3)
+  (setq which-key-show-prefix 'echo)
+  (setq which-key-prefix-prefix "")
+  (setq which-key-echo-keystrokes 0)
+  (defvar my/colors '((path . "#61afef")
+                      (modified . "#e5c07b")
+                      (branch . "#a1d6e2")
+                      (ahead . "#98c379")
+                      (behind . "#e5c07b")
+                      (staged . "#98c379")
+                      (unstaged . "#e06c75")))
+
+  (defun my/color (key)
+    (alist-get key my/colors))
+
+  (defun my/git-status ()
+    "Get p10k-style git status string with colors."
+    (when-let* ((file (buffer-file-name))
+                ((vc-backend file))
+                (branch (car (vc-git-branches)))
+                (default-directory (file-name-directory file))
+                (out (shell-command-to-string "git status --porcelain -b 2>/dev/null")))
+      (let ((ahead 0) (behind 0) (staged 0) (unstaged 0))
+        (dolist (line (split-string out "\n" t))
+          (cond
+           ((string-match "ahead \\([0-9]+\\)" line) (setq ahead (string-to-number (match-string 1 line))))
+           ((string-match "behind \\([0-9]+\\)" line) (setq behind (string-to-number (match-string 1 line))))
+           ((string-match "^[MADRC]" line) (setq staged (1+ staged)))
+           ((string-match "^.[MADRC]" line) (setq unstaged (1+ unstaged)))))
+        (concat (propertize branch 'face `(:foreground ,(my/color 'branch)))
+                (if (> ahead 0) (propertize (format " ↑%d" ahead) 'face `(:foreground ,(my/color 'ahead))) "")
+                (if (> behind 0) (propertize (format " ↓%d" behind) 'face `(:foreground ,(my/color 'behind))) "")
+                (if (> staged 0) (propertize (format " +%d" staged) 'face `(:foreground ,(my/color 'staged))) "")
+                (if (> unstaged 0) (propertize (format " !%d" unstaged) 'face `(:foreground ,(my/color 'unstaged))) "")))))
+
+  (advice-add 'which-key--echo :override
+              (lambda (&rest _)
+                (let* ((path (propertize (abbreviate-file-name (or (buffer-file-name) (buffer-name)))
+                                         'face `(:foreground ,(my/color 'path))))
+                       (mod (cond (buffer-read-only " %%") ((buffer-modified-p) " *") (t nil)))
+                       (mod-str (if mod (propertize mod 'face `(:foreground ,(my/color 'modified))) ""))
+                       (git (my/git-status)))
+                  (message "%s%s%s" path mod-str (if git (format " %s" git) "")))))
   (dolist (n (number-sequence 1 9))
     (push `((,(format "SPC %d" n) . nil) . t) which-key-replacement-alist))
   (which-key-mode 1))
