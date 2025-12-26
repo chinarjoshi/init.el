@@ -1,10 +1,12 @@
-#+title: Emacs Config
 #+property: header-args:emacs-lisp :tangle config.el
 
 #+begin_quote
 /It's a great operating system, lacking only a decent editor/
 #+end_quote
-* Package Setup
+
+#+toc: headlines
+
+** Package Setup
 #+begin_src emacs-lisp
 ;;; config.el --- Emacs config (tangled from README.org) -*- lexical-binding: t -*-
 
@@ -18,7 +20,7 @@
 (setq inhibit-startup-echo-area-message "c")
 #+end_src
 
-* Basics
+** Basics
 #+begin_src emacs-lisp
 ;;; Backups and autosave
 (setq make-backup-files nil)
@@ -46,7 +48,7 @@
                   (set-buffer-modified-p nil)))))
 #+end_src
 
-* UI
+** UI
 #+begin_src emacs-lisp
 ;;; UI
 (add-hook 'prog-mode-hook 'display-line-numbers-mode)
@@ -65,7 +67,7 @@
 (setf (cdr (assq 'truncation fringe-indicator-alist)) '(nil nil))
 #+end_src
 
-* Fonts
+** Fonts
 #+begin_src emacs-lisp
 ;;; Fonts
 (defun my/set-fonts ()
@@ -81,7 +83,7 @@
   (add-hook 'after-init-hook #'my/set-fonts))
 #+end_src
 
-* Org
+** Org
 #+begin_src emacs-lisp
 ;;; Org
 (add-hook 'org-mode-hook 'variable-pitch-mode)
@@ -96,7 +98,7 @@
  '(org-verbatim ((t (:inherit fixed-pitch)))))
 #+end_src
 
-* Notes
+** Notes
 #+begin_src emacs-lisp
 ;; Periodic notes (like Obsidian)
 (defvar notes-directory "~/notes")
@@ -208,7 +210,7 @@
 (global-set-key (kbd "M-]") 'notes-next)
 #+end_src
 
-* Pieces
+** Pieces
 #+begin_src emacs-lisp
 ;; Pieces
 (defvar pieces-directory (expand-file-name "pieces" notes-directory))
@@ -326,7 +328,7 @@
               (pieces-update-tags))))
 #+end_src
 
-* Org Packages
+** Org Packages
 #+begin_src emacs-lisp
 (use-package org-modern
   :ensure t
@@ -364,7 +366,7 @@
                       :foreground "gray60"))
 #+end_src
 
-* Transclusions
+** Transclusions
 #+begin_src emacs-lisp
 ;; Auto-transclusion for periodic notes
 (defun notes--week-days (week-num year)
@@ -467,7 +469,7 @@
               (org-transclusion-mode 1))))
 #+end_src
 
-* Completion
+** Completion
 #+begin_src emacs-lisp
 ;;; Completion (minibuffer)
 (use-package vertico
@@ -503,7 +505,7 @@
   (setq consult-async-input-throttle 0.1))
 #+end_src
 
-* Navigation
+** Navigation
 #+begin_src emacs-lisp
 ;;; Navigation
 (use-package avy
@@ -532,7 +534,7 @@
   :hook (prog-mode . vi-tilde-fringe-mode))
 #+end_src
 
-* In-buffer Completion
+** In-buffer Completion
 #+begin_src emacs-lisp
 ;;; Completion (in-buffer)
 (use-package corfu
@@ -550,7 +552,7 @@
   (add-to-list 'completion-at-point-functions #'cape-file))
 #+end_src
 
-* File Locking
+** File Locking
 #+begin_src emacs-lisp
 ;;; File locking
 (defun toggle-file-lock ()
@@ -567,7 +569,7 @@
     (message "Buffer has no file")))
 #+end_src
 
-* Clipboard
+** Clipboard
 #+begin_src emacs-lisp
 ;;; Wayland clipboard
 (setq interprogram-cut-function
@@ -582,7 +584,7 @@
             (buffer-string)))))
 #+end_src
 
-* Evil
+** Evil
 #+begin_src emacs-lisp
 ;;; Evil
 (use-package evil
@@ -647,7 +649,7 @@
               ("C-x" . evil-numbers/dec-at-pt)))
 #+end_src
 
-* Which-key
+** Which-key
 #+begin_src emacs-lisp
 ;;; Which-key
 (use-package which-key
@@ -701,7 +703,7 @@
   (which-key-mode 1))
 #+end_src
 
-* Leader Key
+** Leader Key
 #+begin_src emacs-lisp
 ;;; General (leader key) - Helix-style space mode
 (use-package general
@@ -786,7 +788,7 @@
          key `(,fn :which-key nil))))))
 #+end_src
 
-* Terminal
+** Terminal
 #+begin_src emacs-lisp
 ;;; Terminal
 (use-package vterm
@@ -795,7 +797,7 @@
   (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"))
 #+end_src
 
-* Git
+** Git
 #+begin_src emacs-lisp
 ;;; Magit
 (use-package magit
@@ -813,7 +815,7 @@
   (diff-hl-flydiff-mode 1))
 #+end_src
 
-* Eglot
+** Eglot
 #+begin_src emacs-lisp
 ;;; Eglot + Languages
 (add-hook 'eglot-managed-mode-hook #'eglot-inlay-hints-mode)
@@ -837,7 +839,7 @@
   (eglot-booster-mode))
 #+end_src
 
-* Languages
+** Languages
 #+begin_src emacs-lisp
 (use-package go-mode
   :ensure t
@@ -916,7 +918,7 @@
   :mode "\\.nix\\'")
 #+end_src
 
-* Treesitter
+** Treesitter
 #+begin_src emacs-lisp
 ;;; Treesitter
 (use-package treesit-auto
