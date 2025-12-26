@@ -17,11 +17,13 @@
 
 ;;; Don't prompt about unsaved buffers on quit
 (setq confirm-kill-processes nil)
-(advice-add 'save-buffers-kill-terminal :before
-            (lambda (&rest _)
-              (dolist (buf (buffer-list))
-                (with-current-buffer buf
-                  (set-buffer-modified-p nil)))))
+(setq confirm-kill-emacs nil)
+(add-hook 'kill-emacs-query-functions
+          (lambda ()
+            (dolist (buf (buffer-list))
+              (with-current-buffer buf
+                (set-buffer-modified-p nil)))
+            t))
 
 ;;; UI
 (add-hook 'prog-mode-hook 'display-line-numbers-mode)
@@ -34,6 +36,8 @@
 (set-face-attribute 'fringe nil :background "#000000")
 (set-face-attribute 'line-number nil :background "#000000")
 (set-face-attribute 'line-number-current-line nil :background "#000000")
+(setf (cdr (assq 'continuation fringe-indicator-alist)) '(nil nil))
+(setf (cdr (assq 'truncation fringe-indicator-alist)) '(nil nil))
 
 ;;; Fonts
 (defun my/set-fonts ()
@@ -52,13 +56,17 @@
 (add-hook 'org-mode-hook 'variable-pitch-mode)
 (add-hook 'org-mode-hook 'auto-save-mode)
 (custom-set-faces
+ ;; custom-set-faces was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
  '(org-block ((t (:inherit fixed-pitch))))
- '(org-code ((t (:inherit fixed-pitch))))
- '(org-verbatim ((t (:inherit fixed-pitch))))
- '(org-table ((t (:inherit fixed-pitch))))
- '(org-meta-line ((t (:inherit fixed-pitch))))
  '(org-block-begin-line ((t (:inherit fixed-pitch))))
- '(org-block-end-line ((t (:inherit fixed-pitch)))))
+ '(org-block-end-line ((t (:inherit fixed-pitch))))
+ '(org-code ((t (:inherit fixed-pitch))))
+ '(org-meta-line ((t (:inherit fixed-pitch))))
+ '(org-table ((t (:inherit fixed-pitch))))
+ '(org-verbatim ((t (:inherit fixed-pitch)))))
 
 ;; Periodic notes (like Obsidian)
 (defvar notes-directory "~/notes")
@@ -556,6 +564,8 @@
 
   (leader-def
     "" '(nil :which-key "leader")
+    "TAB" '(vterm :which-key "terminal")
+    "\\" '(restart-emacs :which-key "restart")
     "SPC" '(pieces-search :which-key "pieces")
     "." '(consult-fd :which-key "find file")
     "," '(consult-buffer :which-key "switch buffer")
@@ -638,6 +648,12 @@
          :prefix "SPC"
          key fn)))))
 
+;;; Terminal
+(use-package vterm
+  :ensure t
+  :config
+  (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"))
+
 ;;; Magit
 (use-package magit
   :ensure t
@@ -718,9 +734,4 @@
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(package-selected-packages nil))
-(custom-set-faces
- ;; custom-set-faces was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
- )
+
