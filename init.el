@@ -7,6 +7,8 @@
 (unless package-archive-contents
   (package-refresh-contents))
 
+(setq inhibit-startup-echo-area-message "c")
+
 ;;; Backups and autosave
 (setq make-backup-files nil)
 (setq auto-save-default nil)
@@ -15,15 +17,19 @@
 ;;; Use y/n instead of yes/no
 (setq use-short-answers t)
 
+;;; Smooth scrolling
+(setq scroll-conservatively 101)
+(setq scroll-margin 2)
+(setq fast-but-imprecise-scrolling t)
+
 ;;; Don't prompt about unsaved buffers on quit
 (setq confirm-kill-processes nil)
 (setq confirm-kill-emacs nil)
-(add-hook 'kill-emacs-query-functions
-          (lambda ()
-            (dolist (buf (buffer-list))
-              (with-current-buffer buf
-                (set-buffer-modified-p nil)))
-            t))
+(advice-add 'save-buffers-kill-terminal :before
+            (lambda (&rest _)
+              (dolist (buf (buffer-list))
+                (with-current-buffer buf
+                  (set-buffer-modified-p nil)))))
 
 ;;; UI
 (add-hook 'prog-mode-hook 'display-line-numbers-mode)
@@ -264,6 +270,19 @@
         (find-file (pieces--tag-to-file found))
       (message "No piece tag at point"))))
 
+(defun pieces-smart-jump ()
+  "Jump to piece if in tagged heading, otherwise search pieces."
+  (interactive)
+  (if (and (derived-mode-p 'org-mode)
+           (org-at-heading-p))
+      (let* ((tags (org-get-tags nil t))
+             (piece-tags (pieces--all-tags))
+             (found (seq-find (lambda (tg) (member tg piece-tags)) tags)))
+        (if found
+            (find-file (pieces--tag-to-file found))
+          (pieces-search)))
+    (pieces-search)))
+
 (defun pieces-show-backlinks ()
   "Show all daily entries tagged with current piece."
   (interactive)
@@ -416,7 +435,11 @@
 (use-package vertico
   :ensure t
   :config
-  (vertico-mode 1))
+  (vertico-mode 1)
+  (setq vertico-count 15)
+  (setq vertico-resize nil)
+  (require 'vertico-repeat)
+  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save))
 
 (use-package orderless
   :ensure t
@@ -435,7 +458,11 @@
   :bind (("C-s" . consult-line)
          ("C-x b" . consult-buffer))
   :config
-  (setq consult-preview-key "any"))
+  (setq consult-preview-key 'any)
+  (setq consult-async-min-input 0)
+  (setq consult-async-refresh-delay 0.1)
+  (setq consult-async-input-debounce 0.05)
+  (setq consult-async-input-throttle 0.1))
 
 ;;; Navigation
 (use-package avy
@@ -478,6 +505,20 @@
   :init
   (add-to-list 'completion-at-point-functions #'cape-file))
 
+;;; File locking
+(defun toggle-file-lock ()
+  "Toggle write permission on current file."
+  (interactive)
+  (if-let ((file (buffer-file-name)))
+      (let* ((modes (file-modes file))
+             (writable (file-writable-p file)))
+        (if writable
+            (set-file-modes file (logand modes #o555))
+          (set-file-modes file (logior modes #o200)))
+        (revert-buffer t t t)
+        (message "File %s" (if writable "locked" "unlocked")))
+    (message "Buffer has no file")))
+
 ;;; Wayland clipboard
 (setq interprogram-cut-function
       (lambda (text)
@@ -498,8 +539,15 @@
   (setq evil-want-Y-yank-to-eol t)
   (setq evil-want-keybinding nil)
   (setq evil-undo-system 'undo-redo)
+  (setq evil-disable-insert-state-bindings t)
   :config
-  (evil-mode 1))
+  (evil-mode 1)
+  ;; Helix-style g bindings for LSP
+  (evil-define-key 'normal 'global
+    "gd" 'xref-find-definitions
+    "gy" 'eglot-find-typeDefinition
+    "gr" 'xref-find-references
+    "gi" 'eglot-find-implementation))
 
 (use-package evil-collection
   :ensure t
@@ -549,10 +597,12 @@
 (use-package which-key
   :ensure t
   :config
-  (setq which-key-idle-delay 0)
+  (setq which-key-idle-delay 0.3)
+  (dolist (n (number-sequence 1 9))
+    (push `((,(format "SPC %d" n) . nil) . t) which-key-replacement-alist))
   (which-key-mode 1))
 
-;;; General (leader key)
+;;; General (leader key) - Helix-style space mode
 (use-package general
   :ensure t
   :after evil
@@ -563,81 +613,66 @@
     :prefix "SPC")
 
   (leader-def
-    "" '(nil :which-key "leader")
+    "" '(nil :which-key "space")
+    "SPC" '(project-find-file :which-key "find file (project)")
+    "\\" '(pieces-smart-jump :which-key "pieces")
+    "|" '(restart-emacs :which-key "restart")
     "TAB" '(vterm :which-key "terminal")
-    "\\" '(restart-emacs :which-key "restart")
-    "SPC" '(pieces-search :which-key "pieces")
+
+    ;; Doom-style punctuation
     "." '(consult-fd :which-key "find file")
     "," '(consult-buffer :which-key "switch buffer")
     ";" '(execute-extended-command :which-key "M-x")
     "x" '(scratch-buffer :which-key "scratch")
 
-    ;; Buffer
-    "b" '(:ignore t :which-key "buffer")
-    "bb" '(switch-to-buffer :which-key "switch")
-    "bd" '(kill-current-buffer :which-key "kill")
-    "bs" '(save-buffer :which-key "save")
+    ;; File/buffer pickers
+    "f" '(project-find-file :which-key "file picker (project)")
+    "F" '(find-file :which-key "file picker (cwd)")
+    "b" '(consult-buffer :which-key "buffer picker")
+    "j" '(evil-show-jumps :which-key "jumplist picker")
 
-    ;; File
-    "f" '(:ignore t :which-key "file")
-    "ff" '(find-file :which-key "find")
-    "fd" '(consult-fd :which-key "fd")
-    "fs" '(save-buffer :which-key "save")
-    "fr" '(consult-recent-file :which-key "recent")
-    "fe" '(dirvish :which-key "dirvish")
-    "ft" '(dirvish-side :which-key "sidebar")
+    ;; LSP
+    "k" '(eldoc-box-help-at-point :which-key "hover docs")
+    "s" '(consult-imenu :which-key "document symbols")
+    "S" '(xref-find-apropos :which-key "workspace symbols")
+    "d" '(consult-flymake :which-key "diagnostics (buffer)")
+    "D" '(flymake-show-project-diagnostics :which-key "diagnostics (project)")
+    "r" '(eglot-rename :which-key "rename symbol")
+    "a" '(eglot-code-actions :which-key "code action")
+    "h" '(xref-find-references :which-key "references")
+
+    ;; Misc
+    "'" '(vertico-repeat :which-key "last picker")
+    "c" '(evil-commentary-line :which-key "comment")
+    "l" '(toggle-file-lock :which-key "lock/unlock file")
+    "C" '((lambda () (interactive) (consult-fd "~/.config")) :which-key "find in ~/.config")
+
+    ;; Clipboard
+    "p" '(clipboard-yank :which-key "paste clipboard")
+    "y" '(clipboard-kill-ring-save :which-key "yank to clipboard")
+    "R" '((lambda () (interactive)
+            (delete-region (region-beginning) (region-end))
+            (clipboard-yank)) :which-key "replace with clipboard")
 
     ;; Search
-    "s" '(:ignore t :which-key "search")
-    "ss" '(consult-line :which-key "line")
-    "sp" '(consult-ripgrep :which-key "project")
-    "si" '(consult-imenu :which-key "imenu")
-    "so" '(consult-outline :which-key "outline")
+    "/" '(consult-ripgrep :which-key "global search")
+    "?" '(execute-extended-command :which-key "command palette")
 
-    ;; Jump
-    "j" '(:ignore t :which-key "jump")
-    "jj" '(avy-goto-char-2 :which-key "char")
-    "jl" '(avy-goto-line :which-key "line")
-    "jw" '(avy-goto-word-1 :which-key "word")
-
-    ;; Git
-    "g" '(:ignore t :which-key "git")
-    "gg" '(magit-status :which-key "status")
-    "gb" '(magit-blame :which-key "blame")
-    "gl" '(magit-log-current :which-key "log")
-
-    ;; Window
+    ;; Window mode
     "w" '(:ignore t :which-key "window")
+    "ww" '(other-window :which-key "other")
     "wv" '(split-window-right :which-key "vsplit")
     "ws" '(split-window-below :which-key "split")
-    "wd" '(delete-window :which-key "delete")
-    "ww" '(other-window :which-key "other")
+    "wd" '(delete-window :which-key "close")
+    "wh" '(windmove-left :which-key "left")
+    "wj" '(windmove-down :which-key "down")
+    "wk" '(windmove-up :which-key "up")
+    "wl" '(windmove-right :which-key "right")
 
     ;; Quit
-    "q" '(:ignore t :which-key "quit")
-    "qq" '(save-buffers-kill-terminal :which-key "quit")
+    "q" '(save-buffers-kill-terminal :which-key "quit"))
 
-    ;; Theme
-    "T" '(consult-theme :which-key "theme")
-
-    ;; Pieces navigation
-    "p" '(:ignore t :which-key "piece")
-    "pp" '(pieces-goto-tag-at-point :which-key "goto tag")
-    "pb" '(pieces-show-backlinks :which-key "backlinks")
-    "pt" '(org-set-tags-command :which-key "set tags")
-
-    ;; Pieces (Acts 1-9, Pieces 1-9)
-    "1" '(:ignore t :which-key "Act 1")
-    "2" '(:ignore t :which-key "Act 2")
-    "3" '(:ignore t :which-key "Act 3")
-    "4" '(:ignore t :which-key "Act 4")
-    "5" '(:ignore t :which-key "Act 5")
-    "6" '(:ignore t :which-key "Act 6")
-    "7" '(:ignore t :which-key "Act 7")
-    "8" '(:ignore t :which-key "Act 8")
-    "9" '(:ignore t :which-key "Act 9"))
-
-  ;; Generate piece bindings for each act
+  ;; Generate piece bindings for each act (hidden from which-key)
   (dolist (act (number-sequence 1 9))
     (dolist (piece (number-sequence 1 9))
       (let ((fn (pieces--make-binding act piece))
@@ -646,7 +681,8 @@
          :states '(normal visual motion)
          :keymaps 'override
          :prefix "SPC"
-         key fn)))))
+         :wk-full-keys nil
+         key `(,fn :which-key nil))))))
 
 ;;; Terminal
 (use-package vterm
@@ -657,7 +693,8 @@
 ;;; Magit
 (use-package magit
   :ensure t
-  :bind ("C-x g" . magit-status))
+  :bind (("C-x g" . magit-status)
+         ("M-g" . magit-status)))
 
 (use-package diff-hl
   :ensure t
@@ -669,21 +706,42 @@
   (diff-hl-flydiff-mode 1))
 
 ;;; Eglot + Languages
+(add-hook 'eglot-managed-mode-hook #'eglot-inlay-hints-mode)
+(add-hook 'eglot-managed-mode-hook #'flymake-mode)
+(setq flymake-fringe-indicator-position nil)
+
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs '(toml-ts-mode . ("taplo" "lsp" "stdio")))
+  (add-to-list 'eglot-server-programs '(yaml-mode . ("yaml-language-server" "--stdio")))
+  (add-to-list 'eglot-server-programs '(yaml-ts-mode . ("yaml-language-server" "--stdio")))
+  (setq eglot-report-progress nil)
+  (advice-add 'eglot--message :override #'ignore))
+
+(use-package eldoc-box
+  :ensure t)
+
+(use-package eglot-booster
+  :vc (:url "https://github.com/jdtsmith/eglot-booster")
+  :after eglot
+  :config
+  (eglot-booster-mode))
 (use-package go-mode
   :ensure t
-  :hook (go-mode . eglot-ensure)
+  :hook ((go-mode go-ts-mode) . eglot-ensure)
   :config
   (add-hook 'before-save-hook
             (lambda ()
-              (when (eq major-mode 'go-mode)
+              (when (derived-mode-p 'go-mode 'go-ts-mode)
                 (eglot-format-buffer)
                 (eglot-code-action-organize-imports (point-min) (point-max))))))
 
-;; Python (uses pyright or pylsp)
+;; Python (uses pyright)
 (add-hook 'python-mode-hook 'eglot-ensure)
+(add-hook 'python-ts-mode-hook 'eglot-ensure)
 
 ;; Shell (uses bash-language-server)
 (add-hook 'sh-mode-hook 'eglot-ensure)
+(add-hook 'bash-ts-mode-hook 'eglot-ensure)
 
 ;; Web development
 (use-package web-mode
@@ -698,22 +756,37 @@
 (use-package typescript-mode
   :ensure t
   :mode "\\.ts\\'"
-  :hook (typescript-mode . eglot-ensure)
+  :hook ((typescript-mode typescript-ts-mode) . eglot-ensure)
   :config
   (setq typescript-indent-level 2))
+
+(add-hook 'tsx-ts-mode-hook 'eglot-ensure)
 
 (use-package js2-mode
   :ensure t
   :mode "\\.js\\'"
-  :hook (js2-mode . eglot-ensure)
+  :hook ((js2-mode js-ts-mode) . eglot-ensure)
   :config
   (setq js2-basic-offset 2))
 
 ;; CSS (built-in)
 (add-hook 'css-mode-hook 'eglot-ensure)
+(add-hook 'css-ts-mode-hook 'eglot-ensure)
 
 ;; JSON (built-in)
 (add-hook 'json-mode-hook 'eglot-ensure)
+(add-hook 'json-ts-mode-hook 'eglot-ensure)
+
+;; C/C++ (uses clangd)
+(add-hook 'c-mode-hook 'eglot-ensure)
+(add-hook 'c-ts-mode-hook 'eglot-ensure)
+(add-hook 'c++-mode-hook 'eglot-ensure)
+(add-hook 'c++-ts-mode-hook 'eglot-ensure)
+
+;; TOML & YAML
+(add-hook 'toml-ts-mode-hook 'eglot-ensure)
+(add-hook 'yaml-mode-hook 'eglot-ensure)
+(add-hook 'yaml-ts-mode-hook 'eglot-ensure)
 
 ;; Lua
 (use-package lua-mode
@@ -721,6 +794,11 @@
   :hook (lua-mode . eglot-ensure)
   :config
   (setq lua-indent-level 2))
+
+;; Nix
+(use-package nix-mode
+  :ensure t
+  :mode "\\.nix\\'")
 
 ;;; Treesitter
 (use-package treesit-auto
@@ -733,5 +811,7 @@
  ;; If you edit it by hand, you could mess it up, so be careful.
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
- '(package-selected-packages nil))
+ '(package-selected-packages nil)
+ '(package-vc-selected-packages
+   '((eglot-booster :url "https://github.com/jdtsmith/eglot-booster"))))
 
