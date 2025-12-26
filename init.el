@@ -305,7 +305,9 @@
 
 (use-package org-modern
   :ensure t
-  :hook (org-mode . org-modern-mode))
+  :hook (org-mode . org-modern-mode)
+  :config
+  (set-face-attribute 'org-block-end-line nil :foreground "#000000"))
 
 (use-package org-appear
   :ensure t
@@ -783,6 +785,7 @@
                 (eglot-code-action-organize-imports (point-min) (point-max))))))
 
 ;; Python (uses pyright)
+(setq python-indent-guess-indent-offset-verbose nil)
 (add-hook 'python-mode-hook 'eglot-ensure)
 (add-hook 'python-ts-mode-hook 'eglot-ensure)
 
