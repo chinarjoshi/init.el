@@ -79,20 +79,17 @@
 Silences save prompts on quit.
 
 #+begin_src emacs-lisp
-(setq make-backup-files nil)
-(setq auto-save-default nil)
-(setq create-lockfiles nil)
-
-(setq use-short-answers t)
-
-(setq echo-keystrokes 0)
-
-(setq scroll-conservatively my/scroll-conservatively)
-(setq scroll-margin my/scroll-margin)
-(setq fast-but-imprecise-scrolling t)
-
-(setq confirm-kill-processes nil)
-(setq confirm-kill-emacs nil)
+(setq make-backup-files nil
+      auto-save-default nil
+      create-lockfiles nil
+      use-short-answers t
+      vc-follow-symlinks t
+      echo-keystrokes 0
+      scroll-conservatively my/scroll-conservatively
+      scroll-margin my/scroll-margin
+      fast-but-imprecise-scrolling t
+      confirm-kill-processes nil
+      confirm-kill-emacs nil)
 (advice-add 'save-buffers-kill-terminal :before
             (lambda (&rest _)
               (dolist (buf (buffer-list))
@@ -436,9 +433,9 @@ Act/Piece file management with tagging and capture.
   :ensure t
   :hook (org-mode . org-appear-mode)
   :config
-  (setq org-appear-autoemphasis t)
-  (setq org-appear-autolinks t)
-  (setq org-appear-autosubmarkers t))
+  (setq org-appear-autoemphasis t
+        org-appear-autolinks t
+        org-appear-autosubmarkers t))
 
 
 (use-package olivetti
@@ -574,17 +571,17 @@ Auto-generates and manages transclusion links for periodic notes.
   :ensure t
   :config
   (vertico-mode 1)
-  (setq vertico-count my/vertico-count)
-  (setq vertico-resize nil)
+  (setq vertico-count my/vertico-count
+        vertico-resize nil)
   (require 'vertico-repeat)
   (add-hook 'minibuffer-setup-hook #'vertico-repeat-save))
 
 (use-package orderless
   :ensure t
   :config
-  (setq completion-styles '(orderless basic))
-  (setq completion-category-overrides nil)
-  (setq completion-category-defaults nil))
+  (setq completion-styles '(orderless basic)
+        completion-category-overrides nil
+        completion-category-defaults nil))
 
 (use-package marginalia
   :ensure t
@@ -596,11 +593,11 @@ Auto-generates and manages transclusion links for periodic notes.
   :bind (("C-s" . consult-line)
          ("C-x b" . consult-buffer))
   :config
-  (setq consult-preview-key 'any)
-  (setq consult-async-min-input my/consult-async-min-input)
-  (setq consult-async-refresh-delay my/consult-async-delay)
-  (setq consult-async-input-debounce my/consult-async-debounce)
-  (setq consult-async-input-throttle my/consult-async-throttle))
+  (setq consult-preview-key 'any
+        consult-async-min-input my/consult-async-min-input
+        consult-async-refresh-delay my/consult-async-delay
+        consult-async-input-debounce my/consult-async-debounce
+        consult-async-input-throttle my/consult-async-throttle))
 #+end_src
 
 ** Navigation
@@ -617,9 +614,9 @@ Auto-generates and manages transclusion links for periodic notes.
   :init
   (dirvish-override-dired-mode)
   :config
-  (setq dirvish-attributes '(nerd-icons file-size collapse subtree-state vc-state git-msg))
-  (setq dirvish-mode-line-format '(:left (sort symlink) :right (omit yank index)))
-  (setq dirvish-side-width 35)
+  (setq dirvish-attributes '(nerd-icons file-size collapse subtree-state vc-state git-msg)
+        dirvish-mode-line-format '(:left (sort symlink) :right (omit yank index))
+        dirvish-side-width 35)
   :bind
   (:map dirvish-mode-map
         ("a" . dirvish-quick-access)
@@ -636,9 +633,9 @@ Auto-generates and manages transclusion links for periodic notes.
 (use-package corfu
   :ensure t
   :config
-  (setq corfu-auto t)
-  (setq corfu-auto-delay my/corfu-delay)
-  (setq corfu-auto-prefix my/corfu-prefix)
+  (setq corfu-auto t
+        corfu-auto-delay my/corfu-delay
+        corfu-auto-prefix my/corfu-prefix)
   (global-corfu-mode 1)
   (add-hook 'org-mode-hook (lambda () (corfu-mode -1))))
 
@@ -654,11 +651,11 @@ Auto-generates and manages transclusion links for periodic notes.
 (use-package evil
   :ensure t
   :init
-  (setq evil-want-C-u-scroll t)
-  (setq evil-want-Y-yank-to-eol t)
-  (setq evil-want-keybinding nil)
-  (setq evil-undo-system 'undo-redo)
-  (setq evil-disable-insert-state-bindings t)
+  (setq evil-want-C-u-scroll t
+        evil-want-Y-yank-to-eol t
+        evil-want-keybinding nil
+        evil-undo-system 'undo-redo
+        evil-disable-insert-state-bindings t)
   :config
   (evil-mode 1)
   (evil-define-key 'normal 'global
@@ -725,10 +722,10 @@ p10k-style git status in echo area.
 (use-package which-key
   :ensure t
   :config
-  (setq which-key-idle-delay my/which-key-delay)
-  (setq which-key-show-prefix 'echo)
-  (setq which-key-prefix-prefix "")
-  (setq which-key-echo-keystrokes 0)
+  (setq which-key-idle-delay my/which-key-delay
+        which-key-show-prefix 'echo
+        which-key-prefix-prefix ""
+        which-key-echo-keystrokes 0)
   (defvar my/colors `((path . ,my/color-blue)
                       (modified . ,my/color-yellow)
                       (branch . ,my/color-cyan)
@@ -924,9 +921,9 @@ Configures Eglot for various languages (Go, Python, Shell, Web, C/C++, Lua, Nix)
   :mode ("\\.html\\'" "\\.jsx\\'" "\\.tsx\\'" "\\.vue\\'")
   :hook (web-mode . eglot-ensure)
   :config
-  (setq web-mode-markup-indent-offset 2)
-  (setq web-mode-css-indent-offset 2)
-  (setq web-mode-code-indent-offset 2))
+  (setq web-mode-markup-indent-offset 2
+        web-mode-css-indent-offset 2
+        web-mode-code-indent-offset 2))
 
 (use-package typescript-mode
   :ensure t
