@@ -99,9 +99,9 @@
 #+begin_src emacs-lisp
 ;;; Fonts
 (defun my/set-fonts ()
-  (set-face-attribute 'default nil :family "Inconsolata Nerd Font" :height 130)
-  (set-face-attribute 'fixed-pitch nil :family "Inconsolata Nerd Font")
-  (set-face-attribute 'variable-pitch nil :family "Lora"))
+  (set-face-attribute 'default nil :family "Inconsolata Nerd Font" :height 140)
+  (set-face-attribute 'fixed-pitch nil :family "Inconsolata Nerd Font" :height 140)
+  (set-face-attribute 'variable-pitch nil :family "Inter" :height 140))
 
 (if (daemonp)
     (add-hook 'after-make-frame-functions
@@ -132,6 +132,7 @@
 ;;; Org
 (add-hook 'org-mode-hook 'variable-pitch-mode)
 (add-hook 'org-mode-hook 'auto-save-mode)
+(setq org-hidden-keywords '(title))
 (custom-set-faces
  '(org-block ((t (:inherit fixed-pitch))))
  '(org-block-begin-line ((t (:inherit fixed-pitch))))
@@ -139,7 +140,9 @@
  '(org-code ((t (:inherit fixed-pitch))))
  '(org-meta-line ((t (:inherit fixed-pitch))))
  '(org-table ((t (:inherit fixed-pitch))))
- '(org-verbatim ((t (:inherit fixed-pitch)))))
+ '(org-verbatim ((t (:inherit fixed-pitch))))
+ '(org-document-title ((t (:height 1.5 :weight bold :foreground "#e06c75"))))
+ '(org-level-1 ((t (:height 1.3 :weight bold)))))
 #+end_src
 
 ** Notes
@@ -161,29 +164,40 @@
     (unless (file-exists-p dir)
       (make-directory dir t))))
 
+(defun notes--insert-title (file)
+  "Insert title for notes if buffer is empty (Obsidian-style)."
+  (when (= (buffer-size) 0)
+    (let ((name (file-name-sans-extension (file-name-nondirectory file))))
+      (insert (format "#+title: %s\n\n" name))
+      (save-buffer))))
+
 (defun notes-open-daily ()
   (interactive)
-  (let* ((time (current-time))
-         (file (notes--daily-file time))
-         (day-name (format-time-string "%A" time))
+  (let* ((file (notes--daily-file (current-time)))
          (new-file (not (file-exists-p file))))
     (notes--ensure-dir file)
     (find-file file)
-    (when (and new-file (= (buffer-size) 0))
-      (insert (format "* :%s:\n" day-name))
-      (save-buffer))))
+    (when new-file (notes--insert-title file))))
+
+;; Open daily note by default
+(add-hook 'emacs-startup-hook #'notes-open-daily)
+(add-hook 'server-after-make-frame-hook #'notes-open-daily)
 
 (defun notes-open-weekly ()
   (interactive)
-  (let ((file (notes--weekly-file (current-time))))
+  (let* ((file (notes--weekly-file (current-time)))
+         (new-file (not (file-exists-p file))))
     (notes--ensure-dir file)
-    (find-file file)))
+    (find-file file)
+    (when new-file (notes--insert-title file))))
 
 (defun notes-open-monthly ()
   (interactive)
-  (let ((file (notes--monthly-file (current-time))))
+  (let* ((file (notes--monthly-file (current-time)))
+         (new-file (not (file-exists-p file))))
     (notes--ensure-dir file)
-    (find-file file)))
+    (find-file file)
+    (when new-file (notes--insert-title file))))
 
 (defun notes--current-type ()
   (when buffer-file-name
@@ -247,11 +261,7 @@
         (notes--ensure-dir file)
         (find-file file)))))
 
-(global-set-key (kbd "|") 'notes-open-daily)
-(global-set-key (kbd "C-\\") 'notes-open-weekly)
-(global-set-key (kbd "C-|") 'notes-open-monthly)
-(global-set-key (kbd "M-[") 'notes-prev)
-(global-set-key (kbd "M-]") 'notes-next)
+;; Keybindings set after Evil loads (see Evil section)
 #+end_src
 
 ** Pieces
@@ -408,10 +418,34 @@
   :ensure t
   :after org
   :config
-  (set-face-attribute 'org-transclusion-fringe nil :foreground "dim gray")
-  (set-face-attribute 'org-transclusion nil
-                      :background nil
-                      :foreground "gray60"))
+  ;; Make C-c C-c work in Evil insert state for live-sync
+  (evil-define-key 'insert org-transclusion-live-sync-map
+    (kbd "C-c C-c") #'org-transclusion-live-sync-exit)
+
+  ;; Wrap transclusions in heading based on source filename
+  (defun notes--wrap-transclusion-content (orig-fn keyword-values type content sbuf sbeg send copy)
+    "Add wrapper heading to transcluded content in periodic notes."
+    (let ((wrapped-content
+           (if (notes--periodic-note-p)
+               (let ((name (file-name-sans-extension
+                            (file-name-nondirectory (buffer-file-name sbuf)))))
+                 (with-temp-buffer
+                   (insert content)
+                   (goto-char (point-min))
+                   ;; Remove #+title: line
+                   (when (re-search-forward "^#\\+title:.*\n" nil t)
+                     (replace-match ""))
+                   (goto-char (point-min))
+                   ;; Demote all headings by one level
+                   (while (re-search-forward "^\\(\\*+\\) " nil t)
+                     (replace-match "*\\1 "))
+                   ;; Add wrapper heading at the start
+                   (goto-char (point-min))
+                   (insert (format "* %s\n" name))
+                   (buffer-string)))
+             content)))
+      (funcall orig-fn keyword-values type wrapped-content sbuf sbeg send copy)))
+  (advice-add 'org-transclusion-content-insert :around #'notes--wrap-transclusion-content))
 #+end_src
 
 ** Transclusions
@@ -443,22 +477,19 @@
           (push (1+ week) weeks))))
     (nreverse weeks)))
 
-(defun notes--get-first-heading (file)
-  "Get the first heading text from FILE for transclusion target."
-  (with-temp-buffer
-    (insert-file-contents file)
-    (goto-char (point-min))
-    (when (re-search-forward "^\\*+[ \t]+\\(.*\\)$" nil t)
-      (match-string 1))))
-
 (defun notes--update-transclusions ()
   "Update transclusion links in weekly/monthly notes."
   (when buffer-file-name
+    ;; Ensure title exists before adding transclusions
+    (when (= (buffer-size) 0)
+      (let ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name))))
+        (insert (format "#+title: %s\n\n" name))
+        (save-buffer)))
     (let* ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
            (dir (file-name-nondirectory (directory-file-name (file-name-directory buffer-file-name))))
            (year (string-to-number (format-time-string "%Y"))))
       (cond
-       ;; Weekly note - transclude daily notes (first heading only)
+       ;; Weekly note - transclude daily notes
        ((string= dir "weekly")
         (let* ((week-num (string-to-number name))
                (days (notes--week-days week-num year))
@@ -467,11 +498,9 @@
           (dolist (day days)
             (let ((file (expand-file-name (format "%02d-%02d.org" (car day) (cdr day)) daily-dir)))
               (when (file-exists-p file)
-                (let ((heading (notes--get-first-heading file)))
-                  (when heading
-                    (push (format "#+transclude: [[file:%s::*%s]]" file heading) links))))))
-          (notes--replace-transclusions (nreverse links))))
-       ;; Monthly note - transclude weekly notes (first heading only)
+                (push (format "#+transclude: [[file:%s]]" file) links))))
+          (notes--add-transclusions (nreverse links))))
+       ;; Monthly note - transclude weekly notes
        ((string= dir "monthly")
         (let* ((weeks (notes--month-weeks name year))
                (weekly-dir (expand-file-name "weekly" notes-directory))
@@ -479,31 +508,21 @@
           (dolist (week weeks)
             (let ((file (expand-file-name (format "%02d.org" week) weekly-dir)))
               (when (file-exists-p file)
-                (let ((heading (notes--get-first-heading file)))
-                  (when heading
-                    (push (format "#+transclude: [[file:%s::*%s]]" file heading) links))))))
-          (notes--replace-transclusions (nreverse links))))))))
+                (push (format "#+transclude: [[file:%s]]" file) links))))
+          (notes--add-transclusions (nreverse links))))))))
 
-(defun notes--replace-transclusions (links)
-  "Replace transclusion block in current buffer."
+(defun notes--add-transclusions (links)
+  "Add transclusion links that don't already exist."
   (save-excursion
-    (goto-char (point-min))
-    (let ((start (if (re-search-forward "^# BEGIN TRANSCLUSIONS$" nil t)
-                     (line-beginning-position)
-                   nil))
-          (end (if (re-search-forward "^# END TRANSCLUSIONS$" nil t)
-                   (line-end-position)
-                 nil)))
-      (if (and start end)
-          (delete-region start (1+ end))
-        (goto-char (point-max))))
-    (goto-char (point-max))
-    (unless (bolp) (insert "\n"))
-    (insert "# BEGIN TRANSCLUSIONS\n")
-    (dolist (link links)
-      (insert link "\n"))
-    (insert "# END TRANSCLUSIONS\n")
-    (save-buffer)))
+    (let ((existing (buffer-string))
+          (added nil))
+      (goto-char (point-max))
+      (dolist (link links)
+        (unless (string-match-p (regexp-quote link) existing)
+          (unless (bolp) (insert "\n"))
+          (insert link "\n")
+          (setq added t)))
+      (when added (save-buffer)))))
 
 (defun notes--periodic-note-p ()
   (when buffer-file-name
@@ -514,7 +533,8 @@
           (lambda ()
             (when (notes--periodic-note-p)
               (notes--update-transclusions)
-              (org-transclusion-mode 1))))
+              (org-transclusion-mode 1)
+              (org-overview))))
 #+end_src
 
 * Navigation
@@ -620,7 +640,14 @@
     "gd" 'xref-find-definitions
     "gy" 'eglot-find-typeDefinition
     "gr" 'xref-find-references
-    "gi" 'eglot-find-implementation))
+    "gi" 'eglot-find-implementation)
+  ;; Notes bindings (override Evil's | column motion)
+  (evil-define-key 'normal 'global
+    "|" 'notes-open-daily)
+  (global-set-key (kbd "C-\\") 'notes-open-weekly)
+  (global-set-key (kbd "C-|") 'notes-open-monthly)
+  (global-set-key (kbd "M-[") 'notes-prev)
+  (global-set-key (kbd "M-]") 'notes-next))
 
 (use-package evil-collection
   :ensure t
