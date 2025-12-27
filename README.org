@@ -37,7 +37,6 @@
 #+begin_src emacs-lisp
 ;;; config.el --- Emacs config (tangled from README.org) -*- lexical-binding: t -*-
 
-;;; Package setup
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (package-initialize)
@@ -49,24 +48,21 @@
 
 * UI
 ** Basics
+Silences save prompts on quit.
+
 #+begin_src emacs-lisp
-;;; Backups and autosave
 (setq make-backup-files nil)
 (setq auto-save-default nil)
 (setq create-lockfiles nil)
 
-;;; Use y/n instead of yes/no
 (setq use-short-answers t)
 
-;;; Show filename instead of key echo
 (setq echo-keystrokes 0)
 
-;;; Smooth scrolling
 (setq scroll-conservatively 101)
 (setq scroll-margin 2)
 (setq fast-but-imprecise-scrolling t)
 
-;;; Don't prompt about unsaved buffers on quit
 (setq confirm-kill-processes nil)
 (setq confirm-kill-emacs nil)
 (advice-add 'save-buffers-kill-terminal :before
@@ -78,10 +74,8 @@
 
 ** UI
 #+begin_src emacs-lisp
-;;; UI
 (add-hook 'prog-mode-hook 'display-line-numbers-mode)
 
-;;; No modeline
 (setq-default mode-line-format nil)
 
 (setq modus-themes-common-palette-overrides
@@ -97,7 +91,6 @@
 
 ** Fonts
 #+begin_src emacs-lisp
-;;; Fonts
 (defun my/set-fonts ()
   (set-face-attribute 'default nil :family "Inconsolata Nerd Font" :height 140)
   (set-face-attribute 'fixed-pitch nil :family "Inconsolata Nerd Font" :height 140)
@@ -112,8 +105,9 @@
 #+end_src
 
 ** Clipboard
+Wayland integration via wl-copy/wl-paste.
+
 #+begin_src emacs-lisp
-;;; Wayland clipboard
 (setq interprogram-cut-function
       (lambda (text)
         (call-process "wl-copy" nil 0 nil text)))
@@ -129,10 +123,16 @@
 * Writing
 ** Org
 #+begin_src emacs-lisp
-;;; Org
 (add-hook 'org-mode-hook 'variable-pitch-mode)
 (add-hook 'org-mode-hook 'auto-save-mode)
 (setq org-hidden-keywords '(title))
+
+(defun notes--start-cursor-after-title ()
+  "Start cursor on line 3 after title and blank line."
+  (goto-char (point-min))
+  (forward-line 2))
+
+(add-hook 'org-mode-hook #'notes--start-cursor-after-title)
 (custom-set-faces
  '(org-block ((t (:inherit fixed-pitch))))
  '(org-block-begin-line ((t (:inherit fixed-pitch))))
@@ -146,8 +146,9 @@
 #+end_src
 
 ** Notes
+Obsidian-style periodic notes (daily/weekly/monthly).
+
 #+begin_src emacs-lisp
-;; Periodic notes (like Obsidian)
 (defvar notes-directory "~/notes")
 
 (defun notes--daily-file (time)
@@ -179,7 +180,6 @@
     (find-file file)
     (when new-file (notes--insert-title file))))
 
-;; Open daily note by default
 (add-hook 'emacs-startup-hook #'notes-open-daily)
 (add-hook 'server-after-make-frame-hook #'notes-open-daily)
 
@@ -260,13 +260,12 @@
                      ('monthly (notes--monthly-file new-time)))))
         (notes--ensure-dir file)
         (find-file file)))))
-
-;; Keybindings set after Evil loads (see Evil section)
 #+end_src
 
 ** Pieces
+Act/Piece file management with tagging and capture.
+
 #+begin_src emacs-lisp
-;; Pieces
 (defvar pieces-directory (expand-file-name "pieces" notes-directory))
 
 (defun pieces--find-file (act piece)
@@ -317,7 +316,6 @@
           (message "Captured to %s" selected))
       (find-file file))))
 
-;; Piece tags
 (defun pieces--name-to-tag (filename)
   "Convert '3_The Big Fight.org' to 'TheBigFight'."
   (let* ((base (file-name-sans-extension (file-name-nondirectory filename)))
@@ -373,7 +371,6 @@
          (daily-dir (expand-file-name "daily" notes-directory)))
     (consult-ripgrep daily-dir (format ":%s:" tag))))
 
-;; Auto-update tags when entering org-mode in notes
 (add-hook 'org-mode-hook
           (lambda ()
             (when (and buffer-file-name
@@ -416,13 +413,12 @@
 
 (use-package org-transclusion
   :ensure t
-  :after org
+  :after (org evil)
   :config
-  ;; Make C-c C-c work in Evil insert state for live-sync
-  (evil-define-key 'insert org-transclusion-live-sync-map
-    (kbd "C-c C-c") #'org-transclusion-live-sync-exit)
+  (with-eval-after-load 'evil
+    (evil-define-key 'insert org-transclusion-live-sync-map
+      (kbd "C-c C-c") #'org-transclusion-live-sync-exit))
 
-  ;; Wrap transclusions in heading based on source filename
   (defun notes--wrap-transclusion-content (orig-fn keyword-values type content sbuf sbeg send copy)
     "Add wrapper heading to transcluded content in periodic notes."
     (let ((wrapped-content
@@ -432,25 +428,24 @@
                  (with-temp-buffer
                    (insert content)
                    (goto-char (point-min))
-                   ;; Remove #+title: line
                    (when (re-search-forward "^#\\+title:.*\n" nil t)
                      (replace-match ""))
                    (goto-char (point-min))
-                   ;; Demote all headings by one level
                    (while (re-search-forward "^\\(\\*+\\) " nil t)
                      (replace-match "*\\1 "))
-                   ;; Add wrapper heading at the start
                    (goto-char (point-min))
                    (insert (format "* %s\n" name))
                    (buffer-string)))
              content)))
       (funcall orig-fn keyword-values type wrapped-content sbuf sbeg send copy)))
+  (advice-remove 'org-transclusion-content-insert #'notes--wrap-transclusion-content)
   (advice-add 'org-transclusion-content-insert :around #'notes--wrap-transclusion-content))
 #+end_src
 
 ** Transclusions
+Auto-generates and manages transclusion links for periodic notes.
+
 #+begin_src emacs-lisp
-;; Auto-transclusion for periodic notes
 (defun notes--week-days (week-num year)
   "Return list of (month day) pairs for a given ISO week."
   (let* ((jan4 (encode-time 0 0 0 4 1 year))
@@ -480,7 +475,6 @@
 (defun notes--update-transclusions ()
   "Update transclusion links in weekly/monthly notes."
   (when buffer-file-name
-    ;; Ensure title exists before adding transclusions
     (when (= (buffer-size) 0)
       (let ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name))))
         (insert (format "#+title: %s\n\n" name))
@@ -489,7 +483,6 @@
            (dir (file-name-nondirectory (directory-file-name (file-name-directory buffer-file-name))))
            (year (string-to-number (format-time-string "%Y"))))
       (cond
-       ;; Weekly note - transclude daily notes
        ((string= dir "weekly")
         (let* ((week-num (string-to-number name))
                (days (notes--week-days week-num year))
@@ -500,7 +493,6 @@
               (when (file-exists-p file)
                 (push (format "#+transclude: [[file:%s]]" file) links))))
           (notes--add-transclusions (nreverse links))))
-       ;; Monthly note - transclude weekly notes
        ((string= dir "monthly")
         (let* ((weeks (notes--month-weeks name year))
                (weekly-dir (expand-file-name "weekly" notes-directory))
@@ -534,13 +526,14 @@
             (when (notes--periodic-note-p)
               (notes--update-transclusions)
               (org-transclusion-mode 1)
+              (org-transclusion-remove-all)
+              (org-transclusion-add-all)
               (org-overview))))
 #+end_src
 
 * Navigation
 ** Completion
 #+begin_src emacs-lisp
-;;; Completion (minibuffer)
 (use-package vertico
   :ensure t
   :config
@@ -576,7 +569,6 @@
 
 ** Navigation
 #+begin_src emacs-lisp
-;;; Navigation
 (use-package avy
   :ensure t)
 
@@ -605,7 +597,6 @@
 
 ** In-buffer Completion
 #+begin_src emacs-lisp
-;;; Completion (in-buffer)
 (use-package corfu
   :ensure t
   :config
@@ -624,7 +615,6 @@
 * Keybindings
 ** Evil
 #+begin_src emacs-lisp
-;;; Evil
 (use-package evil
   :ensure t
   :init
@@ -635,13 +625,11 @@
   (setq evil-disable-insert-state-bindings t)
   :config
   (evil-mode 1)
-  ;; Helix-style g bindings for LSP
   (evil-define-key 'normal 'global
     "gd" 'xref-find-definitions
     "gy" 'eglot-find-typeDefinition
     "gr" 'xref-find-references
     "gi" 'eglot-find-implementation)
-  ;; Notes bindings (override Evil's | column motion)
   (evil-define-key 'normal 'global
     "|" 'notes-open-daily)
   (global-set-key (kbd "C-\\") 'notes-open-weekly)
@@ -695,8 +683,9 @@
 #+end_src
 
 ** Which-key
+p10k-style git status in echo area.
+
 #+begin_src emacs-lisp
-;;; Which-key
 (use-package which-key
   :ensure t
   :config
@@ -749,8 +738,9 @@
 #+end_src
 
 ** Leader Key
+Helix-style space mode with hidden piece bindings (1-9 for acts, 1-9 for pieces).
+
 #+begin_src emacs-lisp
-;;; General (leader key) - Helix-style space mode
 (use-package general
   :ensure t
   :after evil
@@ -767,19 +757,16 @@
     "|" '(restart-emacs :which-key "restart")
     "TAB" '(vterm :which-key "terminal")
 
-    ;; Doom-style punctuation
     "." '(consult-fd :which-key "find file")
     "," '(consult-buffer :which-key "switch buffer")
     ";" '(execute-extended-command :which-key "M-x")
     "x" '(scratch-buffer :which-key "scratch")
 
-    ;; File/buffer pickers
     "f" '(project-find-file :which-key "file picker (project)")
     "F" '(find-file :which-key "file picker (cwd)")
     "b" '(consult-buffer :which-key "buffer picker")
     "j" '(evil-show-jumps :which-key "jumplist picker")
 
-    ;; LSP
     "k" '(eldoc-box-help-at-point :which-key "hover docs")
     "s" '(consult-imenu :which-key "document symbols")
     "S" '(xref-find-apropos :which-key "workspace symbols")
@@ -789,24 +776,20 @@
     "a" '(eglot-code-actions :which-key "code action")
     "h" '(xref-find-references :which-key "references")
 
-    ;; Misc
     "'" '(vertico-repeat :which-key "last picker")
     "c" '(evil-commentary-line :which-key "comment")
     "l" '(toggle-file-lock :which-key "lock/unlock file")
     "C" '((lambda () (interactive) (consult-fd "~/.config")) :which-key "find in ~/.config")
 
-    ;; Clipboard
     "p" '(clipboard-yank :which-key "paste clipboard")
     "y" '(clipboard-kill-ring-save :which-key "yank to clipboard")
     "R" '((lambda () (interactive)
             (delete-region (region-beginning) (region-end))
             (clipboard-yank)) :which-key "replace with clipboard")
 
-    ;; Search
     "/" '(consult-ripgrep :which-key "global search")
     "?" '(execute-extended-command :which-key "command palette")
 
-    ;; Window mode
     "w" '(:ignore t :which-key "window")
     "ww" '(other-window :which-key "other")
     "wv" '(split-window-right :which-key "vsplit")
@@ -817,10 +800,8 @@
     "wk" '(windmove-up :which-key "up")
     "wl" '(windmove-right :which-key "right")
 
-    ;; Quit
     "q" '(save-buffers-kill-terminal :which-key "quit"))
 
-  ;; Generate piece bindings for each act (hidden from which-key)
   (dolist (act (number-sequence 1 9))
     (dolist (piece (number-sequence 1 9))
       (let ((fn (pieces--make-binding act piece))
@@ -836,7 +817,6 @@
 * Coding
 ** Terminal
 #+begin_src emacs-lisp
-;;; Terminal
 (use-package vterm
   :ensure t
   :config
@@ -845,7 +825,6 @@
 
 ** Git
 #+begin_src emacs-lisp
-;;; Magit
 (use-package magit
   :ensure t
   :bind (("C-x g" . magit-status)
@@ -863,7 +842,6 @@
 
 ** Eglot
 #+begin_src emacs-lisp
-;;; Eglot + Languages
 (add-hook 'eglot-managed-mode-hook #'eglot-inlay-hints-mode)
 (add-hook 'eglot-managed-mode-hook #'flymake-mode)
 (setq flymake-fringe-indicator-position nil)
@@ -886,6 +864,8 @@
 #+end_src
 
 ** Languages
+Configures Eglot for various languages (Go, Python, Shell, Web, C/C++, Lua, Nix).
+
 #+begin_src emacs-lisp
 (use-package go-mode
   :ensure t
@@ -897,16 +877,12 @@
                 (eglot-format-buffer)
                 (eglot-code-action-organize-imports (point-min) (point-max))))))
 
-;; Python (uses pyright)
 (setq python-indent-guess-indent-offset-verbose nil)
 (add-hook 'python-mode-hook 'eglot-ensure)
 (add-hook 'python-ts-mode-hook 'eglot-ensure)
 
-;; Shell (uses bash-language-server)
 (add-hook 'sh-mode-hook 'eglot-ensure)
 (add-hook 'bash-ts-mode-hook 'eglot-ensure)
-
-;; Web development
 (use-package web-mode
   :ensure t
   :mode ("\\.html\\'" "\\.jsx\\'" "\\.tsx\\'" "\\.vue\\'")
@@ -932,33 +908,26 @@
   :config
   (setq js2-basic-offset 2))
 
-;; CSS (built-in)
 (add-hook 'css-mode-hook 'eglot-ensure)
 (add-hook 'css-ts-mode-hook 'eglot-ensure)
 
-;; JSON (built-in)
 (add-hook 'json-mode-hook 'eglot-ensure)
 (add-hook 'json-ts-mode-hook 'eglot-ensure)
 
-;; C/C++ (uses clangd)
 (add-hook 'c-mode-hook 'eglot-ensure)
 (add-hook 'c-ts-mode-hook 'eglot-ensure)
 (add-hook 'c++-mode-hook 'eglot-ensure)
 (add-hook 'c++-ts-mode-hook 'eglot-ensure)
 
-;; TOML & YAML
 (add-hook 'toml-ts-mode-hook 'eglot-ensure)
 (add-hook 'yaml-mode-hook 'eglot-ensure)
 (add-hook 'yaml-ts-mode-hook 'eglot-ensure)
-
-;; Lua
 (use-package lua-mode
   :ensure t
   :hook (lua-mode . eglot-ensure)
   :config
   (setq lua-indent-level 2))
 
-;; Nix
 (use-package nix-mode
   :ensure t
   :mode "\\.nix\\'")
@@ -966,7 +935,6 @@
 
 ** Treesitter
 #+begin_src emacs-lisp
-;;; Treesitter
 (use-package treesit-auto
   :ensure t
   :config
@@ -976,7 +944,6 @@
 
 ** File Locking
 #+begin_src emacs-lisp
-;;; File locking
 (defun toggle-file-lock ()
   "Toggle write permission on current file."
   (interactive)
