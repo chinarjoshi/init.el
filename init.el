@@ -24,6 +24,7 @@
  '(org-block-begin-line ((t (:inherit fixed-pitch))))
  '(org-block-end-line ((t (:inherit fixed-pitch))))
  '(org-code ((t (:inherit fixed-pitch))))
+ '(org-level-1 ((t (:height 1.3 :weight bold))))
  '(org-meta-line ((t (:inherit fixed-pitch))))
  '(org-table ((t (:inherit fixed-pitch))))
  '(org-verbatim ((t (:inherit fixed-pitch)))))

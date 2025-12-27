@@ -125,24 +125,30 @@ Wayland integration via wl-copy/wl-paste.
 #+begin_src emacs-lisp
 (add-hook 'org-mode-hook 'variable-pitch-mode)
 (add-hook 'org-mode-hook 'auto-save-mode)
-(setq org-hidden-keywords '(title))
 
-(defun notes--add-top-padding ()
-  "Add negative space above title line."
-  (when (derived-mode-p 'org-mode)
-    (save-excursion
-      (goto-char (point-min))
-      (when (re-search-forward "^#\\+title:" nil t)
-        (let ((ov (make-overlay (line-beginning-position) (line-beginning-position))))
-          (overlay-put ov 'before-string (propertize " " 'display '(space :height 3))))))))
+(use-package markdown-mode
+  :ensure t
+  :mode ("\\.md\\'" "\\.markdown\\'")
+  :hook (markdown-mode . variable-pitch-mode))
 
-(defun notes--start-cursor-after-title ()
-  "Start cursor on line 3 after title and blank line."
-  (goto-char (point-min))
-  (forward-line 2))
+(defun notes--add-virtual-title ()
+  "Add virtual title overlay at top of buffer showing filename."
+  (when buffer-file-name
+    (let* ((title (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
+           (ov (make-overlay 1 1))
+           (display-text (propertize
+                         (concat "\n" title "\n\n")
+                         'face '(:height 1.5 :weight bold :foreground "#e06c75" :family "Inter"))))
+      (overlay-put ov 'before-string display-text))))
 
-(add-hook 'org-mode-hook #'notes--add-top-padding)
-(add-hook 'org-mode-hook #'notes--start-cursor-after-title)
+(defun notes--cursor-after-virtual-title ()
+  "Move cursor below virtual title."
+  (goto-char (point-min)))
+
+(add-hook 'org-mode-hook #'notes--add-virtual-title)
+(add-hook 'markdown-mode-hook #'notes--add-virtual-title)
+(add-hook 'org-mode-hook #'notes--cursor-after-virtual-title)
+(add-hook 'markdown-mode-hook #'notes--cursor-after-virtual-title)
 (custom-set-faces
  '(org-block ((t (:inherit fixed-pitch))))
  '(org-block-begin-line ((t (:inherit fixed-pitch))))
@@ -151,7 +157,6 @@ Wayland integration via wl-copy/wl-paste.
  '(org-meta-line ((t (:inherit fixed-pitch))))
  '(org-table ((t (:inherit fixed-pitch))))
  '(org-verbatim ((t (:inherit fixed-pitch))))
- '(org-document-title ((t (:height 1.5 :weight bold :foreground "#e06c75"))))
  '(org-level-1 ((t (:height 1.3 :weight bold)))))
 #+end_src
 
@@ -160,54 +165,54 @@ Obsidian-style periodic notes (daily/weekly/monthly).
 
 #+begin_src emacs-lisp
 (defvar notes-directory "~/notes")
+(defvar notes-periodic-directory (expand-file-name "periodic" notes-directory))
+
+(defun notes--find-note (base-path)
+  "Find file with .org or .md extension, preferring .org."
+  (let ((org-file (concat base-path ".org"))
+        (md-file (concat base-path ".md")))
+    (cond
+     ((file-exists-p org-file) org-file)
+     ((file-exists-p md-file) md-file)
+     (t org-file))))
 
 (defun notes--daily-file (time)
-  (expand-file-name (format-time-string "daily/%m-%d.org" time) notes-directory))
+  (notes--find-note
+   (expand-file-name (format-time-string "daily/%m-%d" time) notes-periodic-directory)))
 
 (defun notes--weekly-file (time)
-  (expand-file-name (format-time-string "weekly/%V.org" time) notes-directory))
+  (notes--find-note
+   (expand-file-name (format-time-string "weekly/%V" time) notes-periodic-directory)))
 
 (defun notes--monthly-file (time)
-  (expand-file-name (format-time-string "monthly/%B.org" time) notes-directory))
+  (notes--find-note
+   (expand-file-name (format-time-string "monthly/%B" time) notes-periodic-directory)))
 
 (defun notes--ensure-dir (file)
   (let ((dir (file-name-directory file)))
     (unless (file-exists-p dir)
       (make-directory dir t))))
 
-(defun notes--insert-title (file)
-  "Insert title for notes if buffer is empty (Obsidian-style)."
-  (when (= (buffer-size) 0)
-    (let ((name (file-name-sans-extension (file-name-nondirectory file))))
-      (insert (format "#+title: %s\n\n" name))
-      (save-buffer))))
-
 (defun notes-open-daily ()
   (interactive)
-  (let* ((file (notes--daily-file (current-time)))
-         (new-file (not (file-exists-p file))))
+  (let ((file (notes--daily-file (current-time))))
     (notes--ensure-dir file)
-    (find-file file)
-    (when new-file (notes--insert-title file))))
+    (find-file file)))
 
 (add-hook 'emacs-startup-hook #'notes-open-daily)
 (add-hook 'server-after-make-frame-hook #'notes-open-daily)
 
 (defun notes-open-weekly ()
   (interactive)
-  (let* ((file (notes--weekly-file (current-time)))
-         (new-file (not (file-exists-p file))))
+  (let ((file (notes--weekly-file (current-time))))
     (notes--ensure-dir file)
-    (find-file file)
-    (when new-file (notes--insert-title file))))
+    (find-file file)))
 
 (defun notes-open-monthly ()
   (interactive)
-  (let* ((file (notes--monthly-file (current-time)))
-         (new-file (not (file-exists-p file))))
+  (let ((file (notes--monthly-file (current-time))))
     (notes--ensure-dir file)
-    (find-file file)
-    (when new-file (notes--insert-title file))))
+    (find-file file)))
 
 (defun notes--current-type ()
   (when buffer-file-name
@@ -380,7 +385,7 @@ Act/Piece file management with tagging and capture.
   "Show all daily entries tagged with current piece."
   (interactive)
   (let* ((tag (pieces--name-to-tag buffer-file-name))
-         (daily-dir (expand-file-name "daily" notes-directory)))
+         (daily-dir (expand-file-name "daily" notes-periodic-directory)))
     (consult-ripgrep daily-dir (format ":%s:" tag))))
 
 (add-hook 'org-mode-hook
@@ -440,9 +445,6 @@ Act/Piece file management with tagging and capture.
                  (with-temp-buffer
                    (insert content)
                    (goto-char (point-min))
-                   (when (re-search-forward "^#\\+title:.*\n" nil t)
-                     (replace-match ""))
-                   (goto-char (point-min))
                    (while (re-search-forward "^\\(\\*+\\) " nil t)
                      (replace-match "*\\1 "))
                    (goto-char (point-min))
@@ -487,10 +489,6 @@ Auto-generates and manages transclusion links for periodic notes.
 (defun notes--update-transclusions ()
   "Update transclusion links in weekly/monthly notes."
   (when buffer-file-name
-    (when (= (buffer-size) 0)
-      (let ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name))))
-        (insert (format "#+title: %s\n\n" name))
-        (save-buffer)))
     (let* ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
            (dir (file-name-nondirectory (directory-file-name (file-name-directory buffer-file-name))))
            (year (string-to-number (format-time-string "%Y"))))
@@ -498,19 +496,21 @@ Auto-generates and manages transclusion links for periodic notes.
        ((string= dir "weekly")
         (let* ((week-num (string-to-number name))
                (days (notes--week-days week-num year))
-               (daily-dir (expand-file-name "daily" notes-directory))
+               (daily-dir (expand-file-name "daily" notes-periodic-directory))
                (links '()))
           (dolist (day days)
-            (let ((file (expand-file-name (format "%02d-%02d.org" (car day) (cdr day)) daily-dir)))
+            (let* ((base (expand-file-name (format "%02d-%02d" (car day) (cdr day)) daily-dir))
+                   (file (notes--find-note base)))
               (when (file-exists-p file)
                 (push (format "#+transclude: [[file:%s]]" file) links))))
           (notes--add-transclusions (nreverse links))))
        ((string= dir "monthly")
         (let* ((weeks (notes--month-weeks name year))
-               (weekly-dir (expand-file-name "weekly" notes-directory))
+               (weekly-dir (expand-file-name "weekly" notes-periodic-directory))
                (links '()))
           (dolist (week weeks)
-            (let ((file (expand-file-name (format "%02d.org" week) weekly-dir)))
+            (let* ((base (expand-file-name (format "%02d" week) weekly-dir))
+                   (file (notes--find-note base)))
               (when (file-exists-p file)
                 (push (format "#+transclude: [[file:%s]]" file) links))))
           (notes--add-transclusions (nreverse links))))))))
