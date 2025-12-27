@@ -46,6 +46,34 @@
 (setq inhibit-startup-echo-area-message "c")
 #+end_src
 
+** Configuration
+#+begin_src emacs-lisp
+(setq my/color-black "#000000"
+      my/color-dim "#0a0a0a"
+      my/color-red "#e06c75"
+      my/color-blue "#61afef"
+      my/color-yellow "#e5c07b"
+      my/color-cyan "#a1d6e2"
+      my/color-green "#98c379"
+      my/font-fixed "Inconsolata Nerd Font"
+      my/font-variable "Inter"
+      my/font-height 140
+      my/title-height 1.5
+      my/heading-height 1.3
+      my/header-top-space 2
+      my/scroll-margin 2
+      my/scroll-conservatively 101
+      my/olivetti-width 100
+      my/vertico-count 15
+      my/which-key-delay 0.3
+      my/corfu-delay 0.2
+      my/corfu-prefix 3
+      my/consult-async-min-input 0
+      my/consult-async-delay 0.1
+      my/consult-async-debounce 0.05
+      my/consult-async-throttle 0.1)
+#+end_src
+
 * UI
 ** Basics
 Silences save prompts on quit.
@@ -59,8 +87,8 @@ Silences save prompts on quit.
 
 (setq echo-keystrokes 0)
 
-(setq scroll-conservatively 101)
-(setq scroll-margin 2)
+(setq scroll-conservatively my/scroll-conservatively)
+(setq scroll-margin my/scroll-margin)
 (setq fast-but-imprecise-scrolling t)
 
 (setq confirm-kill-processes nil)
@@ -79,12 +107,12 @@ Silences save prompts on quit.
 (setq-default mode-line-format nil)
 
 (setq modus-themes-common-palette-overrides
-      '((bg-main "#000000")
-        (bg-dim "#0a0a0a")
-        (bg-alt "#0a0a0a")))
+      `((bg-main ,my/color-black)
+        (bg-dim ,my/color-dim)
+        (bg-alt ,my/color-dim)))
 (load-theme 'modus-vivendi t)
 (dolist (face '(fringe line-number line-number-current-line))
-  (set-face-attribute face nil :background "#000000"))
+  (set-face-attribute face nil :background my/color-black))
 (setf (cdr (assq 'continuation fringe-indicator-alist)) '(nil nil))
 (setf (cdr (assq 'truncation fringe-indicator-alist)) '(nil nil))
 #+end_src
@@ -92,9 +120,9 @@ Silences save prompts on quit.
 ** Fonts
 #+begin_src emacs-lisp
 (defun my/set-fonts ()
-  (set-face-attribute 'default nil :family "Inconsolata Nerd Font" :height 140)
-  (set-face-attribute 'fixed-pitch nil :family "Inconsolata Nerd Font" :height 140)
-  (set-face-attribute 'variable-pitch nil :family "Inter" :height 140))
+  (set-face-attribute 'default nil :family my/font-fixed :height my/font-height)
+  (set-face-attribute 'fixed-pitch nil :family my/font-fixed :height my/font-height)
+  (set-face-attribute 'variable-pitch nil :family my/font-variable :height my/font-height))
 
 (if (daemonp)
     (add-hook 'after-make-frame-functions
@@ -131,24 +159,19 @@ Wayland integration via wl-copy/wl-paste.
   :mode ("\\.md\\'" "\\.markdown\\'")
   :hook (markdown-mode . variable-pitch-mode))
 
-(defun notes--add-virtual-title ()
-  "Add virtual title overlay at top of buffer showing filename."
+(defun notes--set-header-title ()
+  "Set header line to show filename as title."
   (when buffer-file-name
     (let* ((title (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
-           (ov (make-overlay 1 1))
-           (display-text (propertize
-                         (concat "\n" title "\n\n")
-                         'face '(:height 1.5 :weight bold :foreground "#e06c75" :family "Inter"))))
-      (overlay-put ov 'before-string display-text))))
+           (top-space (propertize " " 'display `(space :height ,my/header-top-space)))
+           (styled-title (propertize title
+                                     'face `(:height ,my/title-height :weight bold :foreground ,my/color-red :family ,my/font-variable))))
+      (setq-local header-line-format (concat top-space styled-title))
+      (let ((ov (make-overlay 1 1)))
+        (overlay-put ov 'before-string "\n")))))
 
-(defun notes--cursor-after-virtual-title ()
-  "Move cursor below virtual title."
-  (goto-char (point-min)))
-
-(add-hook 'org-mode-hook #'notes--add-virtual-title)
-(add-hook 'markdown-mode-hook #'notes--add-virtual-title)
-(add-hook 'org-mode-hook #'notes--cursor-after-virtual-title)
-(add-hook 'markdown-mode-hook #'notes--cursor-after-virtual-title)
+(add-hook 'org-mode-hook #'notes--set-header-title)
+(add-hook 'markdown-mode-hook #'notes--set-header-title)
 (custom-set-faces
  '(org-block ((t (:inherit fixed-pitch))))
  '(org-block-begin-line ((t (:inherit fixed-pitch))))
@@ -157,7 +180,8 @@ Wayland integration via wl-copy/wl-paste.
  '(org-meta-line ((t (:inherit fixed-pitch))))
  '(org-table ((t (:inherit fixed-pitch))))
  '(org-verbatim ((t (:inherit fixed-pitch))))
- '(org-level-1 ((t (:height 1.3 :weight bold)))))
+ `(org-level-1 ((t (:height ,my/heading-height :weight bold))))
+ `(header-line ((t (:background ,my/color-black)))))
 #+end_src
 
 ** Notes
@@ -406,7 +430,7 @@ Act/Piece file management with tagging and capture.
   :ensure t
   :hook (org-mode . org-modern-mode)
   :config
-  (set-face-attribute 'org-block-end-line nil :foreground "#000000"))
+  (set-face-attribute 'org-block-end-line nil :foreground my/color-black))
 
 (use-package org-appear
   :ensure t
@@ -421,8 +445,8 @@ Act/Piece file management with tagging and capture.
   :ensure t
   :hook (org-mode . olivetti-mode)
   :config
-  (setq olivetti-body-width 100)
-  (set-face-attribute 'olivetti-fringe nil :background "#000000"))
+  (setq olivetti-body-width my/olivetti-width)
+  (set-face-attribute 'olivetti-fringe nil :background my/color-black))
 
 (use-package org-fragtog
   :ensure t
@@ -550,7 +574,7 @@ Auto-generates and manages transclusion links for periodic notes.
   :ensure t
   :config
   (vertico-mode 1)
-  (setq vertico-count 15)
+  (setq vertico-count my/vertico-count)
   (setq vertico-resize nil)
   (require 'vertico-repeat)
   (add-hook 'minibuffer-setup-hook #'vertico-repeat-save))
@@ -573,10 +597,10 @@ Auto-generates and manages transclusion links for periodic notes.
          ("C-x b" . consult-buffer))
   :config
   (setq consult-preview-key 'any)
-  (setq consult-async-min-input 0)
-  (setq consult-async-refresh-delay 0.1)
-  (setq consult-async-input-debounce 0.05)
-  (setq consult-async-input-throttle 0.1))
+  (setq consult-async-min-input my/consult-async-min-input)
+  (setq consult-async-refresh-delay my/consult-async-delay)
+  (setq consult-async-input-debounce my/consult-async-debounce)
+  (setq consult-async-input-throttle my/consult-async-throttle))
 #+end_src
 
 ** Navigation
@@ -613,8 +637,8 @@ Auto-generates and manages transclusion links for periodic notes.
   :ensure t
   :config
   (setq corfu-auto t)
-  (setq corfu-auto-delay 0.2)
-  (setq corfu-auto-prefix 3)
+  (setq corfu-auto-delay my/corfu-delay)
+  (setq corfu-auto-prefix my/corfu-prefix)
   (global-corfu-mode 1)
   (add-hook 'org-mode-hook (lambda () (corfu-mode -1))))
 
@@ -701,17 +725,17 @@ p10k-style git status in echo area.
 (use-package which-key
   :ensure t
   :config
-  (setq which-key-idle-delay 0.3)
+  (setq which-key-idle-delay my/which-key-delay)
   (setq which-key-show-prefix 'echo)
   (setq which-key-prefix-prefix "")
   (setq which-key-echo-keystrokes 0)
-  (defvar my/colors '((path . "#61afef")
-                      (modified . "#e5c07b")
-                      (branch . "#a1d6e2")
-                      (ahead . "#98c379")
-                      (behind . "#e5c07b")
-                      (staged . "#98c379")
-                      (unstaged . "#e06c75")))
+  (defvar my/colors `((path . ,my/color-blue)
+                      (modified . ,my/color-yellow)
+                      (branch . ,my/color-cyan)
+                      (ahead . ,my/color-green)
+                      (behind . ,my/color-yellow)
+                      (staged . ,my/color-green)
+                      (unstaged . ,my/color-red)))
 
   (defun my/color (key)
     (alist-get key my/colors))
