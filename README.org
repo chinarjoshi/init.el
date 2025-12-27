@@ -127,11 +127,21 @@ Wayland integration via wl-copy/wl-paste.
 (add-hook 'org-mode-hook 'auto-save-mode)
 (setq org-hidden-keywords '(title))
 
+(defun notes--add-top-padding ()
+  "Add negative space above title line."
+  (when (derived-mode-p 'org-mode)
+    (save-excursion
+      (goto-char (point-min))
+      (when (re-search-forward "^#\\+title:" nil t)
+        (let ((ov (make-overlay (line-beginning-position) (line-beginning-position))))
+          (overlay-put ov 'before-string (propertize " " 'display '(space :height 3))))))))
+
 (defun notes--start-cursor-after-title ()
   "Start cursor on line 3 after title and blank line."
   (goto-char (point-min))
   (forward-line 2))
 
+(add-hook 'org-mode-hook #'notes--add-top-padding)
 (add-hook 'org-mode-hook #'notes--start-cursor-after-title)
 (custom-set-faces
  '(org-block ((t (:inherit fixed-pitch))))
@@ -241,8 +251,9 @@ Obsidian-style periodic notes (daily/weekly/monthly).
                      ('daily (notes--daily-file new-time))
                      ('weekly (notes--weekly-file new-time))
                      ('monthly (notes--monthly-file new-time)))))
-        (notes--ensure-dir file)
-        (find-file file)))))
+        (if (file-exists-p file)
+            (find-file file)
+          (message "No previous note"))))))
 
 (defun notes-next ()
   (interactive)
@@ -258,8 +269,9 @@ Obsidian-style periodic notes (daily/weekly/monthly).
                      ('daily (notes--daily-file new-time))
                      ('weekly (notes--weekly-file new-time))
                      ('monthly (notes--monthly-file new-time)))))
-        (notes--ensure-dir file)
-        (find-file file)))))
+        (if (file-exists-p file)
+            (find-file file)
+          (message "No next note"))))))
 #+end_src
 
 ** Pieces
