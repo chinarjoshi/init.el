@@ -18,64 +18,6 @@
           overlays = [ emacs-overlay.overlays.default ];
         };
 
-        # Emacs packages from ELPA/MELPA
-        emacsPackages = with pkgs.emacsPackages; [
-          # Completion and navigation
-          vertico
-          orderless
-          marginalia
-          consult
-          avy
-
-          # Evil mode ecosystem
-          evil
-          evil-collection
-          evil-surround
-          evil-commentary
-          evil-snipe
-          evil-matchit
-          evil-visualstar
-          evil-numbers
-          goto-chg
-
-          # Org mode extensions
-          toc-org
-          org-modern
-          org-appear
-          olivetti
-          org-fragtog
-          org-transclusion
-
-          # UI enhancements
-          which-key
-          nerd-icons
-          dirvish
-          vi-tilde-fringe
-
-          # Completion
-          corfu
-          cape
-
-          # Language modes
-          markdown-mode
-          go-mode
-          web-mode
-          typescript-mode
-          js2-mode
-          lua-mode
-          nix-mode
-
-          # LSP and development
-          eldoc-box
-          magit
-          diff-hl
-          vterm
-          treesit-auto
-
-          # Utilities
-          general
-        ];
-
         # Language servers and tools
         languageServers = with pkgs; [
           # LSP servers
@@ -101,7 +43,7 @@
           wl-clipboard
 
           # Fonts
-          (nerdfonts.override { fonts = [ "Inconsolata" ]; })
+          nerd-fonts.inconsolata
           inter
 
           # Terminal and build tools
@@ -120,7 +62,6 @@
           config = ./config.el;
           package = pkgs.emacs30-pgtk;
           alwaysEnsure = true;
-          extraEmacsPackages = epkgs: emacsPackages;
         };
 
       in
