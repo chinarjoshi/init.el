@@ -2,3 +2,5 @@ config.el
 eln-cache/
 *~
 +*+
+.direnv/
+result
