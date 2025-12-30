@@ -102,7 +102,14 @@
            (top-space (propertize " " 'display `(space :height ,my/header-top-space)))
            (styled-title (propertize title
                                      'face `(:height ,my/title-height :weight bold :foreground ,my/color-red :family ,my/font-variable))))
-      (setq-local header-line-format (concat top-space styled-title))
+      (setq-local header-line-format
+                  `(,top-space
+                    (:eval
+                     (let* ((title-width (string-pixel-width ,styled-title))
+                            (win-width (window-body-width nil t))
+                            (padding (max 0 (/ (- win-width title-width) 2))))
+                       (propertize " " 'display `(space :width (,padding)))))
+                    ,styled-title))
       (let ((ov (make-overlay 1 1)))
         (overlay-put ov 'before-string "\n")))))
 
@@ -366,7 +373,7 @@
 
 (use-package olivetti
   :ensure t
-  :hook (org-mode . olivetti-mode)
+  :hook ((org-mode markdown-mode) . olivetti-mode)
   :config
   (setq olivetti-body-width my/olivetti-width)
   (set-face-attribute 'olivetti-fringe nil :background my/color-black))
@@ -483,6 +490,51 @@
               (org-transclusion-remove-all)
               (org-transclusion-add-all)
               (org-overview))))
+
+;; Clean HTML5 export without default styling
+(setq org-html-doctype "html5"
+      org-html-html5-fancy t
+      org-html-validation-link nil
+      org-html-head-include-default-style nil
+      org-html-head-include-scripts nil
+      org-html-preamble nil
+      org-html-postamble nil
+      org-export-with-toc nil
+      org-export-with-section-numbers nil
+      org-export-preserve-breaks nil)
+
+;; MathJax 3 configuration
+(setq org-html-mathjax-options
+      '((path "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"))
+      org-html-mathjax-template
+      "<script>
+MathJax = {
+  tex: {
+    inlineMath: [['$', '$']],
+    displayMath: [['\\\\[', '\\\\]']]
+  }
+};
+</script>
+<script type=\"text/javascript\" id=\"MathJax-script\" async src=\"%PATH\"></script>")
+
+;; Export function that opens result in browser for preview
+(defun my/org-html-export-and-open ()
+  "Export to HTML and open in browser for preview."
+  (interactive)
+  (let ((file (org-html-export-to-html)))
+    (browse-url file)))
+
+;; Function to export just the body content (for Hugo fragments)
+(defun my/org-export-body-only ()
+  "Export to HTML body only (no <html>, <head>, etc) for Hugo fragments."
+  (interactive)
+  (let ((org-export-show-temporary-export-buffer t))
+    (org-html-export-as-html nil nil nil t)))
+
+;; Quick export keybindings
+(with-eval-after-load 'org
+  (define-key org-mode-map (kbd "C-c e") 'my/org-export-body-only)
+  (define-key org-mode-map (kbd "C-c E") 'my/org-html-export-and-open))
 
 (use-package vertico
   :ensure t
