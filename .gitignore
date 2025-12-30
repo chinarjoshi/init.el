@@ -3,3 +3,8 @@ eln-cache/
 +*+
 .direnv/
 result
+bookmarks
+elpa/
+projects
+transient/
+tree-sitter/
