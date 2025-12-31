@@ -103,9 +103,11 @@
   :hook ((markdown-mode . variable-pitch-mode)
          (markdown-mode . my/prose-mode-setup)))
 
-;; Save on focus loss (VSCode-style)
+;; Save on focus loss and idle (VSCode-style)
+;; Note: window-selection-change-functions breaks frame resizing
 (add-hook 'focus-out-hook (lambda () (save-some-buffers t)))
-(add-hook 'window-selection-change-functions (lambda (_) (save-some-buffers t)))
+(setq auto-save-visited-interval 1)
+(auto-save-visited-mode 1)
 
 (defun notes--set-header-title ()
   "Display filename as title overlay at buffer start."
