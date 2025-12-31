@@ -812,7 +812,9 @@ MathJax = {
 (use-package magit
   :ensure t
   :bind ("C-x g" . magit-status)
-  :hook (git-commit-mode . evil-insert-state))
+  :hook (git-commit-mode . evil-insert-state)
+  :config
+  (add-hook 'with-editor-post-finish-hook #'delete-window))
 
 (use-package diff-hl
   :ensure t
