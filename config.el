@@ -79,16 +79,8 @@
                   (my/set-fonts))))
   (add-hook 'after-init-hook #'my/set-fonts))
 
-(setq interprogram-cut-function
-      (lambda (text)
-        (call-process "wl-copy" nil 0 nil text)))
-
-(setq interprogram-paste-function
-      (lambda ()
-        (when (zerop (call-process "wl-paste" nil nil nil "-n"))
-          (with-temp-buffer
-            (call-process "wl-paste" nil t nil "-n")
-            (buffer-string)))))
+(setq interprogram-cut-function nil
+      interprogram-paste-function nil)
 
 (defun my/prose-mode-setup ()
   (setq-local line-spacing my/prose-line-spacing)
@@ -624,7 +616,9 @@ MathJax = {
         evil-want-Y-yank-to-eol t
         evil-want-keybinding nil
         evil-undo-system 'undo-redo
-        evil-disable-insert-state-bindings t)
+        evil-disable-insert-state-bindings t
+        evil-split-window-below t
+        evil-vsplit-window-right t)
   :config
   (evil-mode 1)
   (evil-define-key 'normal 'global
@@ -774,11 +768,13 @@ MathJax = {
     "C" '((lambda () (interactive) (find-file "~/nixos/home.nix")) :which-key "nixos config")
     "E" '((lambda () (interactive) (find-file "~/.emacs.d/README.org")) :which-key "emacs config")
 
-    "p" '(clipboard-yank :which-key "paste clipboard")
-    "y" '(clipboard-kill-ring-save :which-key "yank to clipboard")
+    "p" '((lambda () (interactive)
+            (insert (shell-command-to-string "wl-paste -n"))) :which-key "paste clipboard")
+    "y" '((lambda () (interactive)
+            (call-process-region (region-beginning) (region-end) "wl-copy" nil 0)) :which-key "yank to clipboard")
     "R" '((lambda () (interactive)
             (delete-region (region-beginning) (region-end))
-            (clipboard-yank)) :which-key "replace with clipboard")
+            (insert (shell-command-to-string "wl-paste -n"))) :which-key "replace with clipboard")
 
     "g" '((lambda () (interactive)
             (if (project-current)
