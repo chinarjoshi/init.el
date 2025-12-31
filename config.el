@@ -22,7 +22,7 @@
       my/heading-height 1.3
       my/scroll-margin 2
       my/scroll-conservatively 101
-      my/olivetti-width 100
+      my/olivetti-width 80
       my/vertico-count 15
       my/which-key-delay 0.3
       my/corfu-delay 0.2
@@ -730,7 +730,14 @@ MathJax = {
   (leader-def
     "" '(nil :which-key "space")
     "SPC" '(project-find-file :which-key "find file (project)")
-    "\\" '(pieces-smart-jump :which-key "pieces")
+    "\\" '((lambda () (interactive)
+             (let* ((default-directory "~/neuralinux/acts/")
+                    (org-files (cl-remove-if-not
+                                (lambda (f) (string-suffix-p ".org" f))
+                                (project-files (project-current t))))
+                    (file-alist (mapcar (lambda (f) (cons (file-name-base f) f)) org-files)))
+               (find-file
+                (alist-get (completing-read "Piece: " file-alist) file-alist nil nil #'string=)))) :which-key "pieces")
     "|" '(restart-emacs :which-key "restart")
     "TAB" '(vterm :which-key "terminal")
 
@@ -756,7 +763,8 @@ MathJax = {
     "'" '(vertico-repeat :which-key "last picker")
     "c" '(evil-commentary-line :which-key "comment")
     "l" '(toggle-file-lock :which-key "lock/unlock file")
-    "C" '((lambda () (interactive) (consult-fd "~/.config")) :which-key "find in ~/.config")
+    "C" '((lambda () (interactive) (find-file "~/nixos/home.nix")) :which-key "nixos config")
+    "E" '((lambda () (interactive) (find-file "~/.emacs.d/README.org")) :which-key "emacs config")
 
     "p" '(clipboard-yank :which-key "paste clipboard")
     "y" '(clipboard-kill-ring-save :which-key "yank to clipboard")
