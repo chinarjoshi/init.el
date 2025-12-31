@@ -32,7 +32,8 @@
       my/consult-async-debounce 0.05
       my/consult-async-throttle 0.1
       my/prose-line-spacing 0.25
-      my/prose-fg "#bbbbbb")
+      my/prose-fg "#bbbbbb"
+      my/org-setupfile "~/neuralinux/static/macros.org")
 
 (setq make-backup-files nil
       auto-save-default nil
@@ -490,6 +491,14 @@
               (org-transclusion-add-all)
               (org-overview))))
 
+;; Default setupfile for all exports
+(add-hook 'org-export-before-processing-functions
+          (lambda (_backend)
+            (goto-char (point-min))
+            (unless (search-forward "#+setupfile:" nil t)
+              (goto-char (point-min))
+              (insert (format "#+setupfile: %s\n" my/org-setupfile)))))
+
 ;; Clean HTML5 export without default styling
 (setq org-html-doctype "html5"
       org-html-html5-fancy t
@@ -570,7 +579,7 @@ MathJax = {
   :ensure t
   :after evil
   :config
-  (setq avy-timeout-seconds 0.2)
+  (setq avy-timeout-seconds 0.3)
   (evil-define-key 'normal 'global "s" 'avy-goto-char-timer)
   (evil-define-key 'normal 'global "m" 'avy-move-line))
 
