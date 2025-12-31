@@ -557,8 +557,7 @@ MathJax = {
   :bind (("C-s" . consult-line)
          ("C-x b" . consult-buffer))
   :config
-  (setq consult-preview-key 'any
-        consult-async-min-input my/consult-async-min-input
+  (setq consult-async-min-input my/consult-async-min-input
         consult-async-refresh-delay my/consult-async-delay
         consult-async-input-debounce my/consult-async-debounce
         consult-async-input-throttle my/consult-async-throttle))
@@ -569,20 +568,13 @@ MathJax = {
 (use-package nerd-icons
   :ensure t)
 
-(use-package dirvish
+(use-package neotree
   :ensure t
   :after nerd-icons
-  :init
-  (dirvish-override-dired-mode)
   :config
-  (setq dirvish-attributes '(nerd-icons file-size collapse subtree-state vc-state git-msg)
-        dirvish-mode-line-format '(:left (sort symlink) :right (omit yank index))
-        dirvish-side-width 35)
-  :bind
-  (:map dirvish-mode-map
-        ("a" . dirvish-quick-access)
-        ("TAB" . dirvish-subtree-toggle)
-        ("q" . dirvish-quit)))
+  (setq neo-theme 'nerd-icons
+        neo-window-width 30
+        neo-smart-open t))
 
 (use-package vi-tilde-fringe
   :ensure t
@@ -746,7 +738,7 @@ MathJax = {
     ";" '(execute-extended-command :which-key "M-x")
     "x" '(scratch-buffer :which-key "scratch")
 
-    "f" '(project-find-file :which-key "file picker (project)")
+    "f" '(neotree-toggle :which-key "file tree")
     "F" '(find-file :which-key "file picker (cwd)")
     "b" '(consult-buffer :which-key "buffer picker")
     "j" '(evil-show-jumps :which-key "jumplist picker")
@@ -785,7 +777,7 @@ MathJax = {
     "wk" '(windmove-up :which-key "up")
     "wl" '(windmove-right :which-key "right")
 
-    "q" '(save-buffers-kill-terminal :which-key "quit"))
+    "q" '(evil-quit :which-key "quit"))
 
   (dolist (act (number-sequence 1 9))
     (dolist (piece (number-sequence 1 9))
@@ -801,7 +793,13 @@ MathJax = {
 (use-package vterm
   :ensure t
   :config
-  (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"))
+  (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes")
+  (add-to-list 'display-buffer-alist
+               '("\\*vterm\\*"
+                 (display-buffer-in-side-window)
+                 (side . bottom)
+                 (slot . 0)
+                 (window-height . 0.3))))
 
 (use-package magit
   :ensure t
