@@ -593,7 +593,11 @@ Org HTML export configuration for poetry with macros, math, and Hugo integration
       org-html-postamble nil
       org-export-with-toc nil
       org-export-with-section-numbers nil
-      org-export-preserve-breaks nil)
+      org-export-with-author nil
+      org-export-with-date nil
+      org-export-with-title nil
+      org-export-with-broken-links 'mark
+      org-export-preserve-breaks t)
 
 ;; MathJax 3 configuration
 (setq org-html-mathjax-options

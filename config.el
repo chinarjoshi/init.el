@@ -555,7 +555,8 @@ MathJax = {
   :config
   (setq completion-styles '(orderless basic)
         completion-category-overrides nil
-        completion-category-defaults nil))
+        completion-category-defaults nil
+        orderless-matching-styles '(orderless-flex)))
 
 (use-package marginalia
   :ensure t
