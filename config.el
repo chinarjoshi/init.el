@@ -20,7 +20,6 @@
       my/font-height 140
       my/title-height 1.5
       my/heading-height 1.3
-      my/header-top-space 2
       my/scroll-margin 2
       my/scroll-conservatively 101
       my/olivetti-width 100
@@ -96,22 +95,19 @@
   :hook (markdown-mode . variable-pitch-mode))
 
 (defun notes--set-header-title ()
-  "Set header line to show filename as title."
+  "Display filename as title overlay at buffer start."
   (when buffer-file-name
     (let* ((title (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
-           (top-space (propertize " " 'display `(space :height ,my/header-top-space)))
            (styled-title (propertize title
                                      'face `(:height ,my/title-height :weight bold :foreground ,my/color-red :family ,my/font-variable))))
-      (setq-local header-line-format
-                  `(,top-space
-                    (:eval
-                     (let* ((title-width (string-pixel-width ,styled-title))
-                            (win-width (window-body-width nil t))
-                            (padding (max 0 (/ (- win-width title-width) 2))))
-                       (propertize " " 'display `(space :width (,padding)))))
-                    ,styled-title))
+      ;; Remove any existing title overlay
+      (dolist (ov (overlays-at 1))
+        (when (overlay-get ov 'notes-title)
+          (delete-overlay ov)))
+      ;; Create new title overlay
       (let ((ov (make-overlay 1 1)))
-        (overlay-put ov 'before-string "\n")))))
+        (overlay-put ov 'notes-title t)
+        (overlay-put ov 'before-string (concat "\n" styled-title "\n\n"))))))
 
 (add-hook 'org-mode-hook #'notes--set-header-title)
 (add-hook 'markdown-mode-hook #'notes--set-header-title)
@@ -123,8 +119,7 @@
  '(org-meta-line ((t (:inherit fixed-pitch))))
  '(org-table ((t (:inherit fixed-pitch))))
  '(org-verbatim ((t (:inherit fixed-pitch))))
- `(org-level-1 ((t (:height ,my/heading-height :weight bold))))
- `(header-line ((t (:background ,my/color-black)))))
+ `(org-level-1 ((t (:height ,my/heading-height :weight bold)))))
 
 (defvar notes-directory "~/notes")
 (defvar notes-periodic-directory (expand-file-name "periodic" notes-directory))
