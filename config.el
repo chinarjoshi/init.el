@@ -111,15 +111,11 @@
 
 (add-hook 'org-mode-hook #'notes--set-header-title)
 (add-hook 'markdown-mode-hook #'notes--set-header-title)
-(custom-set-faces
- '(org-block ((t (:inherit fixed-pitch))))
- '(org-block-begin-line ((t (:inherit fixed-pitch))))
- '(org-block-end-line ((t (:inherit fixed-pitch))))
- '(org-code ((t (:inherit fixed-pitch))))
- '(org-meta-line ((t (:inherit fixed-pitch))))
- '(org-table ((t (:inherit fixed-pitch))))
- '(org-verbatim ((t (:inherit fixed-pitch))))
- `(org-level-1 ((t (:height ,my/heading-height :weight bold)))))
+(with-eval-after-load 'org
+  (dolist (face '(org-block org-block-begin-line org-block-end-line
+                  org-code org-meta-line org-table org-verbatim))
+    (set-face-attribute face nil :inherit 'fixed-pitch))
+  (set-face-attribute 'org-level-1 nil :height my/heading-height :weight 'bold))
 
 (defvar notes-directory "~/notes")
 (defvar notes-periodic-directory (expand-file-name "periodic" notes-directory))

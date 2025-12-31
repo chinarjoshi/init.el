@@ -174,10 +174,11 @@ Wayland integration via wl-copy/wl-paste.
 
 (add-hook 'org-mode-hook #'notes--set-header-title)
 (add-hook 'markdown-mode-hook #'notes--set-header-title)
-(dolist (face '(org-block org-block-begin-line org-block-end-line
-                org-code org-meta-line org-table org-verbatim))
-  (set-face-attribute face nil :inherit 'fixed-pitch))
-(set-face-attribute 'org-level-1 nil :height my/heading-height :weight 'bold)
+(with-eval-after-load 'org
+  (dolist (face '(org-block org-block-begin-line org-block-end-line
+                  org-code org-meta-line org-table org-verbatim))
+    (set-face-attribute face nil :inherit 'fixed-pitch))
+  (set-face-attribute 'org-level-1 nil :height my/heading-height :weight 'bold))
 #+end_src
 
 ** Notes
