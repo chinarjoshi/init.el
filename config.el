@@ -30,7 +30,9 @@
       my/consult-async-min-input 0
       my/consult-async-delay 0.1
       my/consult-async-debounce 0.05
-      my/consult-async-throttle 0.1)
+      my/consult-async-throttle 0.1
+      my/prose-line-spacing 0.25
+      my/prose-fg "#bbbbbb")
 
 (setq make-backup-files nil
       auto-save-default nil
@@ -86,13 +88,19 @@
             (call-process "wl-paste" nil t nil "-n")
             (buffer-string)))))
 
+(defun my/prose-mode-setup ()
+  (setq-local line-spacing my/prose-line-spacing)
+  (face-remap-add-relative 'default :foreground my/prose-fg))
+
+(add-hook 'org-mode-hook #'my/prose-mode-setup)
 (add-hook 'org-mode-hook 'variable-pitch-mode)
 (add-hook 'org-mode-hook 'auto-save-mode)
 
 (use-package markdown-mode
   :ensure t
   :mode ("\\.md\\'" "\\.markdown\\'")
-  :hook (markdown-mode . variable-pitch-mode))
+  :hook ((markdown-mode . variable-pitch-mode)
+         (markdown-mode . my/prose-mode-setup)))
 
 (defun notes--set-header-title ()
   "Display filename as title overlay at buffer start."
@@ -559,7 +567,12 @@ MathJax = {
         consult-async-input-throttle my/consult-async-throttle))
 
 (use-package avy
-  :ensure t)
+  :ensure t
+  :after evil
+  :config
+  (setq avy-timeout-seconds 0.3)
+  (evil-define-key 'normal 'global "s" 'avy-goto-char-timer)
+  (evil-define-key 'normal 'global "m" 'avy-move-line))
 
 (use-package nerd-icons
   :ensure t)
@@ -629,13 +642,6 @@ MathJax = {
   :after evil
   :config
   (evil-commentary-mode 1))
-
-(use-package evil-snipe
-  :ensure t
-  :after evil
-  :config
-  (evil-snipe-mode 1)
-  (evil-snipe-override-mode 1))
 
 (use-package evil-matchit
   :ensure t
@@ -760,6 +766,11 @@ MathJax = {
             (delete-region (region-beginning) (region-end))
             (clipboard-yank)) :which-key "replace with clipboard")
 
+    "g" '((lambda () (interactive)
+            (if (project-current)
+                (magit-status)
+              (magit-status (project-prompt-project-dir)))) :which-key "git")
+
     "/" '(consult-ripgrep :which-key "global search")
     "?" '(execute-extended-command :which-key "command palette")
 
@@ -788,6 +799,7 @@ MathJax = {
 
 (use-package vterm
   :ensure t
+  :hook (vterm-mode . evil-insert-state)
   :config
   (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes")
   (add-to-list 'display-buffer-alist
@@ -799,8 +811,8 @@ MathJax = {
 
 (use-package magit
   :ensure t
-  :bind (("C-x g" . magit-status)
-         ("M-g" . magit-status)))
+  :bind ("C-x g" . magit-status)
+  :hook (git-commit-mode . evil-insert-state))
 
 (use-package diff-hl
   :ensure t
