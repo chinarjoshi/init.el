@@ -663,7 +663,7 @@ MathJax = {
   :ensure t
   :after evil
   :config
-  (setq avy-timeout-seconds 0.3)
+  (setq avy-timeout-seconds 0.2)
   (evil-define-key 'normal 'global "s" 'avy-goto-char-timer)
   (evil-define-key 'normal 'global "m" 'avy-move-line))
 
