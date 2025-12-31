@@ -103,9 +103,8 @@
   :hook ((markdown-mode . variable-pitch-mode)
          (markdown-mode . my/prose-mode-setup)))
 
-;; Save on focus loss and idle (VSCode-style)
+;; Save on idle (VSCode-style)
 ;; Note: window-selection-change-functions breaks frame resizing
-(add-hook 'focus-out-hook (lambda () (save-some-buffers t)))
 (setq auto-save-visited-interval 1)
 (auto-save-visited-mode 1)
 
@@ -829,7 +828,18 @@ MathJax = {
   :bind ("C-x g" . magit-status)
   :hook (git-commit-mode . evil-insert-state)
   :config
-  (add-hook 'with-editor-post-finish-hook #'delete-window))
+  (add-hook 'with-editor-post-finish-hook #'delete-window)
+
+  ;; Visit worktree file (editable) with quick magit keys
+  (defun my/magit-visit-file ()
+    (interactive)
+    (call-interactively #'magit-diff-visit-worktree-file-other-window)
+    (evil-local-set-key 'normal "q" (lambda () (interactive) (kill-buffer) (delete-window)))
+    (evil-local-set-key 'normal "B" #'magit-blame))
+
+  (define-key magit-diff-mode-map (kbd "RET") #'my/magit-visit-file)
+  (define-key magit-file-section-map (kbd "RET") #'my/magit-visit-file)
+  (define-key magit-hunk-section-map (kbd "RET") #'my/magit-visit-file))
 
 (use-package diff-hl
   :ensure t
