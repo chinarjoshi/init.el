@@ -6,7 +6,8 @@
 (unless package-archive-contents
   (package-refresh-contents))
 
-(setq inhibit-startup-echo-area-message "c")
+(setq inhibit-startup-echo-area-message "c"
+      server-client-instructions nil)
 
 (setq my/color-black "#000000"
       my/color-dim "#0a0a0a"
@@ -95,13 +96,16 @@
 
 (add-hook 'org-mode-hook #'my/prose-mode-setup)
 (add-hook 'org-mode-hook 'variable-pitch-mode)
-(add-hook 'org-mode-hook 'auto-save-mode)
 
 (use-package markdown-mode
   :ensure t
   :mode ("\\.md\\'" "\\.markdown\\'")
   :hook ((markdown-mode . variable-pitch-mode)
          (markdown-mode . my/prose-mode-setup)))
+
+;; Save on focus loss (VSCode-style)
+(add-hook 'focus-out-hook (lambda () (save-some-buffers t)))
+(add-hook 'window-selection-change-functions (lambda (_) (save-some-buffers t)))
 
 (defun notes--set-header-title ()
   "Display filename as title overlay at buffer start."
@@ -785,8 +789,8 @@ MathJax = {
 
     "w" '(:ignore t :which-key "window")
     "ww" '(other-window :which-key "other")
-    "wv" '(split-window-right :which-key "vsplit")
-    "ws" '(split-window-below :which-key "split")
+    "wv" '(evil-window-vsplit :which-key "vsplit")
+    "ws" '(evil-window-split :which-key "split")
     "wd" '(delete-window :which-key "close")
     "wh" '(windmove-left :which-key "left")
     "wj" '(windmove-down :which-key "down")
