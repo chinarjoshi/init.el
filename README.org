@@ -17,7 +17,6 @@
   - [[#notes][Notes]]
   - [[#pieces][Pieces]]
   - [[#org-packages][Org Packages]]
-  - [[#transclusions][Transclusions]]
 - [[#navigation][Navigation]]
   - [[#completion][Completion]]
   - [[#navigation-1][Navigation]]
@@ -191,122 +190,49 @@ SPC y / SPC p for explicit system clipboard via wl-copy/wl-paste.
 #+end_src
 
 ** Notes
-Obsidian-style periodic notes (daily/weekly/monthly).
+Daily notes.
 
 #+begin_src emacs-lisp
+;; TODO: migrate to org
 (defvar notes-directory "~/notes")
-(defvar notes-periodic-directory (expand-file-name "periodic" notes-directory))
-
-(defun notes--find-note (base-path)
-  "Find file with .org or .md extension, preferring .org."
-  (let ((org-file (concat base-path ".org"))
-        (md-file (concat base-path ".md")))
-    (cond
-     ((file-exists-p org-file) org-file)
-     ((file-exists-p md-file) md-file)
-     (t org-file))))
+(defvar notes-daily-directory (expand-file-name "periodic/daily" notes-directory))
 
 (defun notes--daily-file (time)
-  (notes--find-note
-   (expand-file-name (format-time-string "daily/%m-%d" time) notes-periodic-directory)))
-
-(defun notes--weekly-file (time)
-  (notes--find-note
-   (expand-file-name (format-time-string "weekly/%V" time) notes-periodic-directory)))
-
-(defun notes--monthly-file (time)
-  (notes--find-note
-   (expand-file-name (format-time-string "monthly/%B" time) notes-periodic-directory)))
-
-(defun notes--ensure-dir (file)
-  (let ((dir (file-name-directory file)))
-    (unless (file-exists-p dir)
-      (make-directory dir t))))
+  (expand-file-name (format-time-string "%m-%d.md" time) notes-daily-directory))
 
 (defun notes-open-daily ()
   (interactive)
   (let ((file (notes--daily-file (current-time))))
-    (notes--ensure-dir file)
+    (unless (file-exists-p notes-daily-directory)
+      (make-directory notes-daily-directory t))
     (find-file file)))
 
 (add-hook 'emacs-startup-hook #'notes-open-daily)
 (add-hook 'server-after-make-frame-hook #'notes-open-daily)
 
-(defun notes-open-weekly ()
-  (interactive)
-  (let ((file (notes--weekly-file (current-time))))
-    (notes--ensure-dir file)
-    (find-file file)))
-
-(defun notes-open-monthly ()
-  (interactive)
-  (let ((file (notes--monthly-file (current-time))))
-    (notes--ensure-dir file)
-    (find-file file)))
-
-(defun notes--current-type ()
-  (when buffer-file-name
-    (let ((name (file-name-nondirectory buffer-file-name))
-          (dir (file-name-nondirectory (directory-file-name (file-name-directory buffer-file-name)))))
-      (cond
-       ((string= dir "daily") 'daily)
-       ((string= dir "weekly") 'weekly)
-       ((string= dir "monthly") 'monthly)))))
-
-(defun notes--parse-date ()
-  (let ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
-        (type (notes--current-type))
-        (year (string-to-number (format-time-string "%Y"))))
-    (pcase type
-      ('daily (let ((parts (split-string name "-")))
-                (encode-time 0 0 0
-                             (string-to-number (cadr parts))
-                             (string-to-number (car parts))
-                             year)))
-      ('weekly (let ((week (string-to-number name)))
-                 (encode-time 0 0 0 (1+ (* (1- week) 7)) 1 year)))
-      ('monthly (encode-time 0 0 0 1
-                             (1+ (seq-position
-                                  '("January" "February" "March" "April" "May" "June"
-                                    "July" "August" "September" "October" "November" "December")
-                                  name #'string=))
-                             year)))))
+(defun notes--current-time ()
+  (when-let* ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
+              (parts (split-string name "-")))
+    (encode-time 0 0 0
+                 (string-to-number (cadr parts))
+                 (string-to-number (car parts))
+                 (string-to-number (format-time-string "%Y")))))
 
 (defun notes-prev ()
   (interactive)
-  (let ((type (notes--current-type))
-        (time (notes--parse-date)))
-    (when type
-      (let* ((offset (pcase type
-                       ('daily (days-to-time 1))
-                       ('weekly (days-to-time 7))
-                       ('monthly (days-to-time 30))))
-             (new-time (time-subtract time offset))
-             (file (pcase type
-                     ('daily (notes--daily-file new-time))
-                     ('weekly (notes--weekly-file new-time))
-                     ('monthly (notes--monthly-file new-time)))))
-        (if (file-exists-p file)
-            (find-file file)
-          (message "No previous note"))))))
+  (when-let ((time (notes--current-time)))
+    (cl-loop for i from 1 to 365
+             for file = (notes--daily-file (time-subtract time (days-to-time i)))
+             when (file-exists-p file) return (find-file file)
+             finally (message "No previous note"))))
 
 (defun notes-next ()
   (interactive)
-  (let ((type (notes--current-type))
-        (time (notes--parse-date)))
-    (when type
-      (let* ((offset (pcase type
-                       ('daily (days-to-time 1))
-                       ('weekly (days-to-time 7))
-                       ('monthly (days-to-time 30))))
-             (new-time (time-add time offset))
-             (file (pcase type
-                     ('daily (notes--daily-file new-time))
-                     ('weekly (notes--weekly-file new-time))
-                     ('monthly (notes--monthly-file new-time)))))
-        (if (file-exists-p file)
-            (find-file file)
-          (message "No next note"))))))
+  (when-let ((time (notes--current-time)))
+    (cl-loop for i from 1 to 365
+             for file = (notes--daily-file (time-add time (days-to-time i)))
+             when (file-exists-p file) return (find-file file)
+             finally (message "No next note"))))
 #+end_src
 
 ** Pieces
@@ -464,113 +390,7 @@ Act/Piece file management with tagging and capture.
   :config
   (with-eval-after-load 'evil
     (evil-define-key 'insert org-transclusion-live-sync-map
-      (kbd "C-c C-c") #'org-transclusion-live-sync-exit))
-
-  (defun notes--wrap-transclusion-content (orig-fn keyword-values type content sbuf sbeg send copy)
-    "Add wrapper heading to transcluded content in periodic notes."
-    (let ((wrapped-content
-           (if (notes--periodic-note-p)
-               (let ((name (file-name-sans-extension
-                            (file-name-nondirectory (buffer-file-name sbuf)))))
-                 (with-temp-buffer
-                   (insert content)
-                   (goto-char (point-min))
-                   (while (re-search-forward "^\\(\\*+\\) " nil t)
-                     (replace-match "*\\1 "))
-                   (goto-char (point-min))
-                   (insert (format "* %s\n" name))
-                   (buffer-string)))
-             content)))
-      (funcall orig-fn keyword-values type wrapped-content sbuf sbeg send copy)))
-  (advice-remove 'org-transclusion-content-insert #'notes--wrap-transclusion-content)
-  (advice-add 'org-transclusion-content-insert :around #'notes--wrap-transclusion-content))
-#+end_src
-
-** Transclusions
-Auto-generates and manages transclusion links for periodic notes.
-
-#+begin_src emacs-lisp
-(defun notes--week-days (week-num year)
-  "Return list of (month day) pairs for a given ISO week."
-  (let* ((jan4 (encode-time 0 0 0 4 1 year))
-         (jan4-dow (string-to-number (format-time-string "%u" jan4)))
-         (week1-mon (time-subtract jan4 (days-to-time (1- jan4-dow))))
-         (week-mon (time-add week1-mon (days-to-time (* 7 (1- week-num)))))
-         (days '()))
-    (dotimes (i 7)
-      (let ((day (time-add week-mon (days-to-time i))))
-        (push (cons (string-to-number (format-time-string "%m" day))
-                    (string-to-number (format-time-string "%d" day)))
-              days)))
-    (nreverse days)))
-
-(defun notes--month-weeks (month-name year)
-  "Return list of week numbers that have days in the given month."
-  (let* ((months '("January" "February" "March" "April" "May" "June"
-                   "July" "August" "September" "October" "November" "December"))
-         (month-num (1+ (seq-position months month-name #'string=)))
-         (weeks '()))
-    (dotimes (week 53)
-      (let ((days (notes--week-days (1+ week) year)))
-        (when (seq-find (lambda (d) (= (car d) month-num)) days)
-          (push (1+ week) weeks))))
-    (nreverse weeks)))
-
-(defun notes--update-transclusions ()
-  "Update transclusion links in weekly/monthly notes."
-  (when buffer-file-name
-    (let* ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
-           (dir (file-name-nondirectory (directory-file-name (file-name-directory buffer-file-name))))
-           (year (string-to-number (format-time-string "%Y"))))
-      (cond
-       ((string= dir "weekly")
-        (let* ((week-num (string-to-number name))
-               (days (notes--week-days week-num year))
-               (daily-dir (expand-file-name "daily" notes-periodic-directory))
-               (links '()))
-          (dolist (day days)
-            (let* ((base (expand-file-name (format "%02d-%02d" (car day) (cdr day)) daily-dir))
-                   (file (notes--find-note base)))
-              (when (file-exists-p file)
-                (push (format "#+transclude: [[file:%s]]" file) links))))
-          (notes--add-transclusions (nreverse links))))
-       ((string= dir "monthly")
-        (let* ((weeks (notes--month-weeks name year))
-               (weekly-dir (expand-file-name "weekly" notes-periodic-directory))
-               (links '()))
-          (dolist (week weeks)
-            (let* ((base (expand-file-name (format "%02d" week) weekly-dir))
-                   (file (notes--find-note base)))
-              (when (file-exists-p file)
-                (push (format "#+transclude: [[file:%s]]" file) links))))
-          (notes--add-transclusions (nreverse links))))))))
-
-(defun notes--add-transclusions (links)
-  "Add transclusion links that don't already exist."
-  (save-excursion
-    (let ((existing (buffer-string))
-          (added nil))
-      (goto-char (point-max))
-      (dolist (link links)
-        (unless (string-match-p (regexp-quote link) existing)
-          (unless (bolp) (insert "\n"))
-          (insert link "\n")
-          (setq added t)))
-      (when added (save-buffer)))))
-
-(defun notes--periodic-note-p ()
-  (when buffer-file-name
-    (let ((dir (file-name-nondirectory (directory-file-name (file-name-directory buffer-file-name)))))
-      (member dir '("weekly" "monthly")))))
-
-(add-hook 'find-file-hook
-          (lambda ()
-            (when (notes--periodic-note-p)
-              (notes--update-transclusions)
-              (org-transclusion-mode 1)
-              (org-transclusion-remove-all)
-              (org-transclusion-add-all)
-              (org-overview))))
+      (kbd "C-c C-c") #'org-transclusion-live-sync-exit)))
 #+end_src
 
 * Navigation
@@ -665,7 +485,9 @@ Auto-generates and manages transclusion links for periodic notes.
         evil-undo-system 'undo-redo
         evil-disable-insert-state-bindings t
         evil-split-window-below t
-        evil-vsplit-window-right t)
+        evil-vsplit-window-right t
+        evil-insert-state-cursor 'bar)
+  (blink-cursor-mode -1)
   :config
   (evil-mode 1)
   (evil-define-key 'normal 'global
@@ -675,8 +497,6 @@ Auto-generates and manages transclusion links for periodic notes.
     "gi" 'eglot-find-implementation)
   (evil-define-key 'normal 'global
     "|" 'notes-open-daily)
-  (global-set-key (kbd "C-\\") 'notes-open-weekly)
-  (global-set-key (kbd "C-|") 'notes-open-monthly)
   (global-set-key (kbd "M-[") 'notes-prev)
   (global-set-key (kbd "M-]") 'notes-next))
 
