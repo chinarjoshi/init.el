@@ -517,7 +517,8 @@
   (setq consult-async-min-input my/consult-async-min-input
         consult-async-refresh-delay my/consult-async-delay
         consult-async-input-debounce my/consult-async-debounce
-        consult-async-input-throttle my/consult-async-throttle))
+        consult-async-input-throttle my/consult-async-throttle
+        consult-buffer-filter '("\\`\\*" "\\` ")))
 
 (use-package avy
   :ensure t
