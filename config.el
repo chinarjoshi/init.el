@@ -487,37 +487,6 @@
               (org-transclusion-add-all)
               (org-overview))))
 
-;; Clean HTML5 export without default styling
-(with-eval-after-load 'ox-html
-  (setq org-html-doctype "html5"
-        org-html-html5-fancy t
-        org-html-validation-link nil
-        org-html-head-include-default-style nil
-        org-html-head-include-scripts nil
-        org-html-preamble nil
-        org-html-postamble nil
-        org-export-with-toc nil
-        org-export-with-section-numbers nil
-        org-export-with-author nil
-        org-export-with-date nil
-        org-export-with-title nil
-        org-export-with-broken-links 'mark
-        org-export-preserve-breaks t))
-
-;; MathJax 3 configuration
-(setq org-html-mathjax-options
-      '((path "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"))
-      org-html-mathjax-template
-      "<script>
-MathJax = {
-  tex: {
-    inlineMath: [['$', '$']],
-    displayMath: [['\\\\[', '\\\\]']]
-  }
-};
-</script>
-<script type=\"text/javascript\" id=\"MathJax-script\" async src=\"%PATH\"></script>")
-
 (use-package vertico
   :ensure t
   :config
@@ -696,6 +665,7 @@ MathJax = {
                   (message "%s%s%s" path mod-str (if git (format " %s" git) "")))))
   (dolist (n (number-sequence 1 9))
     (push `((,(format "SPC %d" n) . nil) . t) which-key-replacement-alist))
+  (push '(("g" . "evil-.*") . t) which-key-replacement-alist)
   (which-key-mode 1))
 
 (use-package general
@@ -706,6 +676,11 @@ MathJax = {
     :states '(normal visual motion)
     :keymaps 'override
     :prefix "SPC")
+
+  (general-define-key
+   :states 'normal
+   :keymaps 'override
+   "K" 'eldoc-box-help-at-point)
 
   (leader-def
     "" '(nil :which-key "space")
@@ -797,6 +772,7 @@ MathJax = {
                  (slot . 0)
                  (window-height . 0.3))))
 
+(setq magit-no-confirm '(stage-all-changes unstage-all-changes))
 (use-package magit
   :ensure t
   :bind ("C-x g" . magit-status)
@@ -826,6 +802,8 @@ MathJax = {
 
 (add-hook 'eglot-managed-mode-hook #'eglot-inlay-hints-mode)
 (add-hook 'eglot-managed-mode-hook #'flymake-mode)
+(setq eldoc-echo-area-use-multiline-p nil
+      eldoc-display-functions '(eldoc-display-in-buffer))
 (setq flymake-fringe-indicator-position nil)
 
 (with-eval-after-load 'eglot
