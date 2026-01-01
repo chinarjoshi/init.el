@@ -33,8 +33,7 @@
       my/consult-async-debounce 0.05
       my/consult-async-throttle 0.1
       my/prose-line-spacing 0.25
-      my/prose-fg "#bbbbbb"
-      my/org-setupfile "~/neuralinux/static/macros.org")
+      my/prose-fg "#bbbbbb")
 
 (setq make-backup-files nil
       auto-save-default nil
@@ -488,25 +487,22 @@
               (org-transclusion-add-all)
               (org-overview))))
 
-;; Default setupfile for all exports
-(add-hook 'org-export-before-processing-functions
-          (lambda (_backend)
-            (goto-char (point-min))
-            (unless (search-forward "#+setupfile:" nil t)
-              (goto-char (point-min))
-              (insert (format "#+setupfile: %s\n" my/org-setupfile)))))
-
 ;; Clean HTML5 export without default styling
-(setq org-html-doctype "html5"
-      org-html-html5-fancy t
-      org-html-validation-link nil
-      org-html-head-include-default-style nil
-      org-html-head-include-scripts nil
-      org-html-preamble nil
-      org-html-postamble nil
-      org-export-with-toc nil
-      org-export-with-section-numbers nil
-      org-export-preserve-breaks nil)
+(with-eval-after-load 'ox-html
+  (setq org-html-doctype "html5"
+        org-html-html5-fancy t
+        org-html-validation-link nil
+        org-html-head-include-default-style nil
+        org-html-head-include-scripts nil
+        org-html-preamble nil
+        org-html-postamble nil
+        org-export-with-toc nil
+        org-export-with-section-numbers nil
+        org-export-with-author nil
+        org-export-with-date nil
+        org-export-with-title nil
+        org-export-with-broken-links 'mark
+        org-export-preserve-breaks t))
 
 ;; MathJax 3 configuration
 (setq org-html-mathjax-options
@@ -521,25 +517,6 @@ MathJax = {
 };
 </script>
 <script type=\"text/javascript\" id=\"MathJax-script\" async src=\"%PATH\"></script>")
-
-;; Export function that opens result in browser for preview
-(defun my/org-html-export-and-open ()
-  "Export to HTML and open in browser for preview."
-  (interactive)
-  (let ((file (org-html-export-to-html)))
-    (browse-url file)))
-
-;; Function to export just the body content (for Hugo fragments)
-(defun my/org-export-body-only ()
-  "Export to HTML body only (no <html>, <head>, etc) for Hugo fragments."
-  (interactive)
-  (let ((org-export-show-temporary-export-buffer t))
-    (org-html-export-as-html nil nil nil t)))
-
-;; Quick export keybindings
-(with-eval-after-load 'org
-  (define-key org-mode-map (kbd "C-c e") 'my/org-export-body-only)
-  (define-key org-mode-map (kbd "C-c E") 'my/org-html-export-and-open))
 
 (use-package vertico
   :ensure t

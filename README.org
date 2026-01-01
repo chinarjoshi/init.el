@@ -575,20 +575,21 @@ Org HTML export configuration for poetry with macros, math, and Hugo integration
 
 #+begin_src emacs-lisp
 ;; Clean HTML5 export without default styling
-(setq org-html-doctype "html5"
-      org-html-html5-fancy t
-      org-html-validation-link nil
-      org-html-head-include-default-style nil
-      org-html-head-include-scripts nil
-      org-html-preamble nil
-      org-html-postamble nil
-      org-export-with-toc nil
-      org-export-with-section-numbers nil
-      org-export-with-author nil
-      org-export-with-date nil
-      org-export-with-title nil
-      org-export-with-broken-links 'mark
-      org-export-preserve-breaks t)
+(with-eval-after-load 'ox-html
+  (setq org-html-doctype "html5"
+        org-html-html5-fancy t
+        org-html-validation-link nil
+        org-html-head-include-default-style nil
+        org-html-head-include-scripts nil
+        org-html-preamble nil
+        org-html-postamble nil
+        org-export-with-toc nil
+        org-export-with-section-numbers nil
+        org-export-with-author nil
+        org-export-with-date nil
+        org-export-with-title nil
+        org-export-with-broken-links 'mark
+        org-export-preserve-breaks t))
 
 ;; MathJax 3 configuration
 (setq org-html-mathjax-options
@@ -608,36 +609,37 @@ MathJax = {
 * Navigation
 ** Completion
 #+begin_src emacs-lisp
-(use-package vertico
-  :ensure t
-  :config
-  (vertico-mode 1)
-  (setq vertico-count my/vertico-count
-        vertico-resize nil)
-  (require 'vertico-repeat)
-  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save))
+  (use-package vertico
+    :ensure t
+    :config
+    (vertico-mode 1)
+    (setq vertico-count my/vertico-count
+          vertico-resize nil)
+    (require 'vertico-repeat)
+    (add-hook 'minibuffer-setup-hook #'vertico-repeat-save))
 
-(use-package orderless
-  :ensure t
-  :config
-  (setq completion-styles '(orderless basic)
-        completion-category-overrides nil
-        completion-category-defaults nil))
+  (use-package orderless
+    :ensure t
+    :config
+    (setq completion-styles '(orderless basic)
+          completion-category-overrides nil
+          completion-category-defaults nil
+          orderless-matching-styles '(orderless-flex)))
 
-(use-package marginalia
-  :ensure t
-  :config
-  (marginalia-mode 1))
+  (use-package marginalia
+    :ensure t
+    :config
+    (marginalia-mode 1))
 
-(use-package consult
-  :ensure t
-  :bind (("C-s" . consult-line)
-         ("C-x b" . consult-buffer))
-  :config
-  (setq consult-async-min-input my/consult-async-min-input
-        consult-async-refresh-delay my/consult-async-delay
-        consult-async-input-debounce my/consult-async-debounce
-        consult-async-input-throttle my/consult-async-throttle))
+  (use-package consult
+    :ensure t
+    :bind (("C-s" . consult-line)
+           ("C-x b" . consult-buffer))
+    :config
+    (setq consult-async-min-input my/consult-async-min-input
+          consult-async-refresh-delay my/consult-async-delay
+          consult-async-input-debounce my/consult-async-debounce
+          consult-async-input-throttle my/consult-async-throttle))
 #+end_src
 
 ** Navigation
