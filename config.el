@@ -32,7 +32,7 @@
       my/consult-async-delay 0.1
       my/consult-async-debounce 0.05
       my/consult-async-throttle 0.1
-      my/prose-line-spacing 0.25
+      my/prose-line-spacing 0.15
       my/prose-fg "#bbbbbb")
 
 (setq make-backup-files nil
@@ -348,7 +348,7 @@
         consult-async-refresh-delay my/consult-async-delay
         consult-async-input-debounce my/consult-async-debounce
         consult-async-input-throttle my/consult-async-throttle
-        consult-buffer-filter '("\\`\\*" "\\` ")))
+        consult-buffer-filter '("\\`\\*" "\\` " "\\`[0-9]\\{2\\}-[0-9]\\{2\\}\\.md\\'")))
 
 (use-package avy
   :ensure t
