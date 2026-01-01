@@ -120,7 +120,11 @@
   (dolist (face '(org-block org-block-begin-line org-block-end-line
                   org-code org-meta-line org-table org-verbatim))
     (set-face-attribute face nil :inherit 'fixed-pitch))
-  (set-face-attribute 'org-level-1 nil :height my/heading-height :weight 'bold))
+  (set-face-attribute 'org-level-1 nil :height my/heading-height :weight 'bold)
+  (font-lock-add-keywords
+   'org-mode
+   '(("@\\([a-zA-Z_][a-zA-Z0-9_]*\\)(\\([^)]*\\))"
+      (0 'org-macro t)))))
 
 (defvar notes-directory "~/notes")
 (defvar notes-periodic-directory (expand-file-name "periodic" notes-directory))
