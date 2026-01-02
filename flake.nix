@@ -18,6 +18,9 @@
           overlays = [ emacs-overlay.overlays.default ];
         };
 
+        isLinux = pkgs.stdenv.isLinux;
+        isDarwin = pkgs.stdenv.isDarwin;
+
         # Language servers and tools
         languageServers = with pkgs; [
           # LSP servers
@@ -39,9 +42,6 @@
 
         # System dependencies
         systemDeps = with pkgs; [
-          # Clipboard (Wayland)
-          wl-clipboard
-
           # Fonts
           nerd-fonts.inconsolata
           inter
@@ -55,12 +55,17 @@
           # Search tools
           ripgrep
           fd
+        ]
+        ++ pkgs.lib.optionals isLinux [
+          pkgs.wl-clipboard  # Wayland clipboard
         ];
 
         # Custom Emacs with packages
+        emacsPackage = if isDarwin then pkgs.emacs30 else pkgs.emacs30-pgtk;
+
         myEmacs = pkgs.emacsWithPackagesFromUsePackage {
           config = ./config.el;
-          package = pkgs.emacs30-pgtk;
+          package = emacsPackage;
           alwaysEnsure = true;
         };
 
