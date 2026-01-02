@@ -169,115 +169,34 @@
 
 (defvar pieces-directory (expand-file-name "pieces" notes-directory))
 
-(defun pieces--find-file (act piece)
+(defun pieces--file (act piece)
   (let* ((act-dir (expand-file-name (format "Act %d" act) pieces-directory))
-         (pattern (format "^%d_.*\\.org$" piece))
+         (pattern (format "^%d_.*\\.md$" piece))
          (files (and (file-directory-p act-dir)
                      (directory-files act-dir t pattern))))
     (if files
         (car files)
-      (expand-file-name (format "%d_.org" piece) act-dir))))
+      (expand-file-name (format "%d_.md" piece) act-dir))))
 
-(defun pieces-open-or-capture (act piece)
-  (let ((file (pieces--find-file act piece)))
-    (pieces--ensure-dir file)
-    (if (use-region-p)
-        (let ((text (buffer-substring-no-properties (region-beginning) (region-end))))
-          (with-current-buffer (find-file-noselect file)
-            (goto-char (point-max))
-            (insert "\n" text)
-            (save-buffer))
-          (deactivate-mark)
-          (message "Captured to %s" (file-name-nondirectory file)))
-      (find-file file))))
-
-(defun pieces--ensure-dir (file)
-  (let ((dir (file-name-directory file)))
+(defun pieces-open (act piece)
+  (let ((file (pieces--file act piece))
+        (dir (expand-file-name (format "Act %d" act) pieces-directory)))
     (unless (file-exists-p dir)
-      (make-directory dir t))))
+      (make-directory dir t))
+    (find-file file)))
 
 (defun pieces--make-binding (act piece)
-  (let ((fn (lambda () (interactive) (pieces-open-or-capture act piece))))
+  (let ((fn (lambda () (interactive) (pieces-open act piece))))
     (defalias (intern (format "pieces-open-%d-%d" act piece)) fn)
     (intern (format "pieces-open-%d-%d" act piece))))
 
 (defun pieces-search ()
   (interactive)
-  (let* ((files (directory-files-recursively pieces-directory "\\.org$"))
-         (names (mapcar (lambda (f) (file-relative-name f pieces-directory)) files))
-         (selected (completing-read "Piece: " names nil t))
-         (file (expand-file-name selected pieces-directory)))
-    (if (use-region-p)
-        (let ((text (buffer-substring-no-properties (region-beginning) (region-end))))
-          (with-current-buffer (find-file-noselect file)
-            (goto-char (point-max))
-            (insert "\n" text)
-            (save-buffer))
-          (deactivate-mark)
-          (message "Captured to %s" selected))
-      (find-file file))))
-
-(defun pieces--name-to-tag (filename)
-  "Convert '3_The Big Fight.org' to 'TheBigFight'."
-  (let* ((base (file-name-sans-extension (file-name-nondirectory filename)))
-         (name (if (string-match "^[0-9]+_\\(.*\\)" base)
-                   (match-string 1 base)
-                 base)))
-    (replace-regexp-in-string " " "" name)))
-
-(defun pieces--tag-to-file (tag)
-  "Find file matching tag 'TheBigFight'."
-  (let ((files (directory-files-recursively pieces-directory "\\.org$")))
-    (seq-find (lambda (f) (string= tag (pieces--name-to-tag f))) files)))
-
-(defun pieces--all-tags ()
-  "Get all piece tags."
-  (let ((files (directory-files-recursively pieces-directory "\\.org$")))
-    (mapcar #'pieces--name-to-tag files)))
-
-(defun pieces-update-tags ()
-  "Update org-tag-alist with piece tags."
-  (interactive)
-  (setq org-tag-alist
-        (mapcar (lambda (tag) (cons tag ?p)) (pieces--all-tags)))
-  (message "Updated %d piece tags" (length org-tag-alist)))
-
-(defun pieces-goto-tag-at-point ()
-  "Jump to piece file for tag at point."
-  (interactive)
-  (let* ((tag (org-get-tags nil t))
-         (piece-tags (pieces--all-tags))
-         (found (seq-find (lambda (t) (member t piece-tags)) tag)))
-    (if found
-        (find-file (pieces--tag-to-file found))
-      (message "No piece tag at point"))))
-
-(defun pieces-smart-jump ()
-  "Jump to piece if in tagged heading, otherwise search pieces."
-  (interactive)
-  (if (and (derived-mode-p 'org-mode)
-           (org-at-heading-p))
-      (let* ((tags (org-get-tags nil t))
-             (piece-tags (pieces--all-tags))
-             (found (seq-find (lambda (tg) (member tg piece-tags)) tags)))
-        (if found
-            (find-file (pieces--tag-to-file found))
-          (pieces-search)))
-    (pieces-search)))
-
-(defun pieces-show-backlinks ()
-  "Show all daily entries tagged with current piece."
-  (interactive)
-  (let* ((tag (pieces--name-to-tag buffer-file-name))
-         (daily-dir (expand-file-name "daily" notes-periodic-directory)))
-    (consult-ripgrep daily-dir (format ":%s:" tag))))
-
-(add-hook 'org-mode-hook
-          (lambda ()
-            (when (and buffer-file-name
-                       (string-prefix-p (expand-file-name notes-directory)
-                                        (expand-file-name buffer-file-name)))
-              (pieces-update-tags))))
+  (let* ((dir "~/neuralinux/acts/")
+         (files (directory-files-recursively dir "\\.md$"))
+         (file-alist (mapcar (lambda (f) (cons (file-name-base f) f)) files))
+         (selected (completing-read "Piece: " file-alist nil t)))
+    (find-file (cdr (assoc selected file-alist)))))
 
 (use-package toc-org
   :ensure t
@@ -516,14 +435,7 @@
   (leader-def
     "" '(nil :which-key "space")
     "SPC" '(project-find-file :which-key "find file (project)")
-    "\\" '((lambda () (interactive)
-             (let* ((default-directory "~/neuralinux/acts/")
-                    (org-files (cl-remove-if-not
-                                (lambda (f) (string-suffix-p ".org" f))
-                                (project-files (project-current t))))
-                    (file-alist (mapcar (lambda (f) (cons (file-name-base f) f)) org-files)))
-               (find-file
-                (alist-get (completing-read "Piece: " file-alist) file-alist nil nil #'string=)))) :which-key "pieces")
+    "\\" '(pieces-search :which-key "pieces")
     "|" '(restart-emacs :which-key "restart")
     "TAB" '(vterm :which-key "terminal")
 
@@ -567,16 +479,6 @@
 
     "/" '(consult-ripgrep :which-key "global search")
     "?" '(execute-extended-command :which-key "command palette")
-
-    "w" '(:ignore t :which-key "window")
-    "ww" '(other-window :which-key "other")
-    "wv" '(evil-window-vsplit :which-key "vsplit")
-    "ws" '(evil-window-split :which-key "split")
-    "wd" '(delete-window :which-key "close")
-    "wh" '(windmove-left :which-key "left")
-    "wj" '(windmove-down :which-key "down")
-    "wk" '(windmove-up :which-key "up")
-    "wl" '(windmove-right :which-key "right")
 
     "q" '(evil-quit :which-key "quit"))
 
