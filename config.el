@@ -7,7 +7,6 @@
   (package-refresh-contents))
 
 (setq inhibit-startup-echo-area-message "c"
-      inhibit-startup-message t
       server-client-instructions nil)
 
 (setq my/color-black "#000000"
@@ -53,17 +52,17 @@
                 (with-current-buffer buf
                   (set-buffer-modified-p nil)))))
 
+(setq display-line-numbers-width 3)
 (add-hook 'prog-mode-hook 'display-line-numbers-mode)
 
 (setq-default mode-line-format nil)
 
-(setq modus-themes-common-palette-overrides
-      `((bg-main ,my/color-black)
-        (bg-dim ,my/color-dim)
-        (bg-alt ,my/color-dim)))
-(load-theme 'modus-vivendi t)
-(dolist (face '(fringe line-number line-number-current-line))
-  (set-face-attribute face nil :background my/color-black))
+(use-package doom-themes
+  :ensure t
+  :config
+  (load-theme 'doom-one t)
+  (dolist (face '(default fringe line-number line-number-current-line))
+    (set-face-attribute face nil :background my/color-black)))
 (setf (cdr (assq 'continuation fringe-indicator-alist)) '(nil nil))
 (setf (cdr (assq 'truncation fringe-indicator-alist)) '(nil nil))
 
@@ -121,6 +120,7 @@
   (dolist (face '(org-block org-block-begin-line org-block-end-line
                   org-code org-meta-line org-table org-verbatim))
     (set-face-attribute face nil :inherit 'fixed-pitch))
+  (set-face-attribute 'org-block nil :background my/color-black)
   (set-face-attribute 'org-level-1 nil :height my/heading-height :weight 'bold)
   (font-lock-add-keywords
    'org-mode
@@ -261,6 +261,10 @@
   :config
   (marginalia-mode 1))
 
+(setq recentf-save-file "~/.cache/emacs/recentf")
+(make-directory "~/.cache/emacs" t)
+(recentf-mode 1)
+
 (use-package consult
   :ensure t
   :bind (("C-s" . consult-line)
@@ -331,7 +335,8 @@
   (evil-define-key 'normal 'global
     "|" 'notes-open-daily)
   (global-set-key (kbd "M-[") 'notes-prev)
-  (global-set-key (kbd "M-]") 'notes-next))
+  (global-set-key (kbd "M-]") 'notes-next)
+  (global-set-key (kbd "<backtab>") 'vterm-toggle))
 
 (use-package evil-collection
   :ensure t
@@ -373,10 +378,11 @@
 (use-package which-key
   :ensure t
   :config
-  (setq which-key-idle-delay my/which-key-delay
+  (setq which-key-idle-delay 0
         which-key-show-prefix 'echo
         which-key-prefix-prefix ""
-        which-key-echo-keystrokes 0)
+        which-key-echo-keystrokes 0
+        which-key-allow-regexps '("^SPC"))
   (defvar my/colors `((path . ,my/color-blue)
                       (modified . ,my/color-yellow)
                       (branch . ,my/color-cyan)
@@ -437,51 +443,50 @@
 
   (leader-def
     "" '(nil :which-key "space")
-    "SPC" '(project-find-file :which-key "find file (project)")
+    "SPC" '((lambda () (interactive)
+              (if (project-current)
+                  (magit-status)
+                (magit-status (project-prompt-project-dir)))) :which-key "git")
     "\\" '(pieces-search :which-key "pieces")
     "|" '(restart-emacs :which-key "restart")
-    "TAB" '(vterm :which-key "terminal")
 
-    "." '(consult-fd :which-key "find file")
-    "," '(consult-buffer :which-key "switch buffer")
-    ";" '(execute-extended-command :which-key "M-x")
+    "." '(consult-fd :which-key "find")
+    "," '(consult-buffer :which-key "buffers")
+    ";" '(neotree-toggle :which-key "tree")
     "x" '(scratch-buffer :which-key "scratch")
 
-    "f" '(neotree-toggle :which-key "file tree")
-    "F" '(find-file :which-key "file picker (cwd)")
-    "b" '(consult-buffer :which-key "buffer picker")
-    "j" '(evil-show-jumps :which-key "jumplist picker")
+    "f" '(project-find-file :which-key "files")
+    "F" '(find-file :which-key "file")
+    "P" '(project-switch-project :which-key "projects")
+    "b" '(consult-buffer :which-key "buffers")
+    "j" '(evil-show-jumps :which-key "jumps")
 
-    "k" '(eldoc-box-help-at-point :which-key "hover docs")
-    "s" '(consult-imenu :which-key "document symbols")
-    "S" '(xref-find-apropos :which-key "workspace symbols")
-    "d" '(consult-flymake :which-key "diagnostics (buffer)")
-    "D" '(flymake-show-project-diagnostics :which-key "diagnostics (project)")
-    "r" '(eglot-rename :which-key "rename symbol")
-    "a" '(eglot-code-actions :which-key "code action")
+    "k" '(eldoc-box-help-at-point :which-key "hover")
+    "s" '(consult-imenu :which-key "symbols")
+    "S" '(xref-find-apropos :which-key "workspace-symbols")
+    "d" '(consult-flymake :which-key "diagnostics")
+    "D" '(flymake-show-project-diagnostics :which-key "project-diag")
+    "r" '(consult-recent-file :which-key "recent")
+    "a" '(eglot-code-actions :which-key "actions")
     "h" '(xref-find-references :which-key "references")
 
-    "'" '(vertico-repeat :which-key "last picker")
+    "'" '(vertico-repeat :which-key "repeat")
     "c" '(evil-commentary-line :which-key "comment")
-    "l" '(toggle-file-lock :which-key "lock/unlock file")
-    "C" '((lambda () (interactive) (find-file "~/nixos/home.nix")) :which-key "nixos config")
-    "E" '((lambda () (interactive) (find-file "~/.emacs.d/README.org")) :which-key "emacs config")
+    "l" '(toggle-file-lock :which-key "lock")
+    "C" '((lambda () (interactive) (find-file "~/nixos/home.nix")) :which-key "nixos")
+    "E" '((lambda () (interactive) (find-file "~/.emacs.d/README.org")) :which-key "emacs")
 
     "p" '((lambda () (interactive)
-            (insert (shell-command-to-string "wl-paste -n"))) :which-key "paste clipboard")
+            (insert (shell-command-to-string "wl-paste -n"))) :which-key "paste")
     "y" '((lambda () (interactive)
-            (call-process-region (region-beginning) (region-end) "wl-copy" nil 0)) :which-key "yank to clipboard")
+            (call-process-region (region-beginning) (region-end) "wl-copy" nil 0)
+            (evil-exit-visual-state)) :which-key "yank")
     "R" '((lambda () (interactive)
             (delete-region (region-beginning) (region-end))
-            (insert (shell-command-to-string "wl-paste -n"))) :which-key "replace with clipboard")
+            (insert (shell-command-to-string "wl-paste -n"))) :which-key "replace")
 
-    "g" '((lambda () (interactive)
-            (if (project-current)
-                (magit-status)
-              (magit-status (project-prompt-project-dir)))) :which-key "git")
-
-    "/" '(consult-ripgrep :which-key "global search")
-    "?" '(execute-extended-command :which-key "command palette")
+    "/" '(consult-ripgrep :which-key "search")
+    "?" '(execute-extended-command :which-key "commands")
 
     "q" '(evil-quit :which-key "quit"))
 
@@ -496,18 +501,30 @@
          :wk-full-keys nil
          key `(,fn :which-key nil))))))
 
+(setq project-switch-commands 'project-find-file)
+
 (use-package vterm
   :ensure t
   :hook (vterm-mode . evil-insert-state)
   :config
   (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"
         vterm-timer-delay 0.01)
+  (define-key vterm-mode-map (kbd "C-c") #'vterm--self-insert)
+  (define-key vterm-mode-map (kbd "C-u") #'vterm--self-insert)
+  (define-key vterm-mode-map (kbd "<backtab>") #'vterm-toggle)
   (add-to-list 'display-buffer-alist
                '("\\*vterm\\*"
                  (display-buffer-in-side-window)
                  (side . bottom)
                  (slot . 0)
-                 (window-height . 0.3))))
+                 (window-height . 0.5))))
+
+(defun vterm-toggle ()
+  "Toggle vterm side window."
+  (interactive)
+  (if-let ((win (get-buffer-window "*vterm*")))
+      (delete-window win)
+    (vterm)))
 
 (defun vterm-full ()
   "Open vterm in full frame."
