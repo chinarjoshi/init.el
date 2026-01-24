@@ -25,7 +25,6 @@
       my/scroll-conservatively 101
       my/olivetti-width 80
       my/vertico-count 15
-      my/which-key-delay 0.3
       my/corfu-delay 0.2
       my/corfu-prefix 3
       my/consult-async-min-input 0
@@ -46,11 +45,6 @@
       fast-but-imprecise-scrolling t
       confirm-kill-processes nil
       confirm-kill-emacs nil)
-(advice-add 'save-buffers-kill-terminal :before
-            (lambda (&rest _)
-              (dolist (buf (buffer-list))
-                (with-current-buffer buf
-                  (set-buffer-modified-p nil)))))
 
 (setq display-line-numbers-width 3)
 (add-hook 'prog-mode-hook 'display-line-numbers-mode)
@@ -80,6 +74,16 @@
 
 (setq interprogram-cut-function nil
       interprogram-paste-function nil)
+
+(defun my/clipboard-get ()
+  (shell-command-to-string (if (eq system-type 'darwin) "pbpaste" "wl-paste -n")))
+
+(defun my/clipboard-paste ()
+  (interactive)
+  (let ((content (my/clipboard-get)))
+    (if (derived-mode-p 'vterm-mode)
+        (vterm-send-string content)
+      (insert content))))
 
 (defun my/prose-mode-setup ()
   (setq-local line-spacing my/prose-line-spacing)
@@ -165,29 +169,6 @@
              when (file-exists-p file) return (find-file file)
              finally (message "No next note"))))
 
-(defvar pieces-directory (expand-file-name "pieces" notes-directory))
-
-(defun pieces--file (act piece)
-  (let* ((act-dir (expand-file-name (format "Act %d" act) pieces-directory))
-         (pattern (format "^%d_.*\\.md$" piece))
-         (files (and (file-directory-p act-dir)
-                     (directory-files act-dir t pattern))))
-    (if files
-        (car files)
-      (expand-file-name (format "%d_.md" piece) act-dir))))
-
-(defun pieces-open (act piece)
-  (let ((file (pieces--file act piece))
-        (dir (expand-file-name (format "Act %d" act) pieces-directory)))
-    (unless (file-exists-p dir)
-      (make-directory dir t))
-    (find-file file)))
-
-(defun pieces--make-binding (act piece)
-  (let ((fn (lambda () (interactive) (pieces-open act piece))))
-    (defalias (intern (format "pieces-open-%d-%d" act piece)) fn)
-    (intern (format "pieces-open-%d-%d" act piece))))
-
 (defun pieces-search ()
   (interactive)
   (let* ((dir "~/neuralinux/acts/")
@@ -225,14 +206,6 @@
 (use-package org-fragtog
   :ensure t
   :hook (org-mode . org-fragtog-mode))
-
-(use-package org-transclusion
-  :ensure t
-  :after (org evil)
-  :config
-  (with-eval-after-load 'evil
-    (evil-define-key 'insert org-transclusion-live-sync-map
-      (kbd "C-c C-c") #'org-transclusion-live-sync-exit)))
 
 (use-package vertico
   :ensure t
@@ -290,10 +263,6 @@
         neo-window-width 30
         neo-smart-open t))
 
-(use-package vi-tilde-fringe
-  :ensure t
-  :hook (prog-mode . vi-tilde-fringe-mode))
-
 (use-package corfu
   :ensure t
   :config
@@ -327,11 +296,11 @@
     "gy" 'eglot-find-typeDefinition
     "gr" 'xref-find-references
     "gi" 'eglot-find-implementation)
-  (evil-define-key 'normal 'global
-    "|" 'notes-open-daily)
+  (global-set-key (kbd "M-\\") 'notes-open-daily)
   (global-set-key (kbd "M-[") 'notes-prev)
   (global-set-key (kbd "M-]") 'notes-next)
-  (global-set-key (kbd "<backtab>") 'vterm-toggle))
+  (global-set-key (kbd "M-SPC") 'vterm-full-toggle)
+  (global-set-key (kbd "M-S-SPC") 'vterm-toggle))
 
 (use-package evil-collection
   :ensure t
@@ -351,25 +320,6 @@
   :config
   (evil-commentary-mode 1))
 
-(use-package evil-matchit
-  :ensure t
-  :after evil
-  :config
-  (global-evil-matchit-mode 1))
-
-(use-package evil-visualstar
-  :ensure t
-  :after evil
-  :config
-  (global-evil-visualstar-mode 1))
-
-(use-package evil-numbers
-  :ensure t
-  :after evil
-  :bind (:map evil-normal-state-map
-              ("C-a" . evil-numbers/inc-at-pt)
-              ("C-x" . evil-numbers/dec-at-pt)))
-
 (use-package which-key
   :ensure t
   :config
@@ -378,19 +328,9 @@
         which-key-prefix-prefix ""
         which-key-echo-keystrokes 0
         which-key-allow-regexps '("^SPC"))
-  (defvar my/colors `((path . ,my/color-blue)
-                      (modified . ,my/color-yellow)
-                      (branch . ,my/color-cyan)
-                      (ahead . ,my/color-green)
-                      (behind . ,my/color-yellow)
-                      (staged . ,my/color-green)
-                      (unstaged . ,my/color-red)))
-
-  (defun my/color (key)
-    (alist-get key my/colors))
 
   (defun my/git-status ()
-    "Get p10k-style git status string with colors."
+    "Get p10k-style git status string."
     (when-let* ((file (buffer-file-name))
                 ((vc-backend file))
                 (branch (car (vc-git-branches)))
@@ -403,23 +343,20 @@
            ((string-match "behind \\([0-9]+\\)" line) (setq behind (string-to-number (match-string 1 line))))
            ((string-match "^[MADRC]" line) (setq staged (1+ staged)))
            ((string-match "^.[MADRC]" line) (setq unstaged (1+ unstaged)))))
-        (concat (propertize branch 'face `(:foreground ,(my/color 'branch)))
-                (if (> ahead 0) (propertize (format " ↑%d" ahead) 'face `(:foreground ,(my/color 'ahead))) "")
-                (if (> behind 0) (propertize (format " ↓%d" behind) 'face `(:foreground ,(my/color 'behind))) "")
-                (if (> staged 0) (propertize (format " +%d" staged) 'face `(:foreground ,(my/color 'staged))) "")
-                (if (> unstaged 0) (propertize (format " !%d" unstaged) 'face `(:foreground ,(my/color 'unstaged))) "")))))
+        (concat (propertize branch 'face `(:foreground ,my/color-cyan))
+                (if (> ahead 0) (propertize (format " ↑%d" ahead) 'face `(:foreground ,my/color-green)) "")
+                (if (> behind 0) (propertize (format " ↓%d" behind) 'face `(:foreground ,my/color-yellow)) "")
+                (if (> staged 0) (propertize (format " +%d" staged) 'face `(:foreground ,my/color-green)) "")
+                (if (> unstaged 0) (propertize (format " !%d" unstaged) 'face `(:foreground ,my/color-red)) "")))))
 
   (advice-add 'which-key--echo :override
               (lambda (&rest _)
                 (let* ((path (propertize (abbreviate-file-name (or (buffer-file-name) (buffer-name)))
-                                         'face `(:foreground ,(my/color 'path))))
+                                         'face `(:foreground ,my/color-blue)))
                        (mod (cond (buffer-read-only " %%") ((buffer-modified-p) " *") (t nil)))
-                       (mod-str (if mod (propertize mod 'face `(:foreground ,(my/color 'modified))) ""))
+                       (mod-str (if mod (propertize mod 'face `(:foreground ,my/color-yellow)) ""))
                        (git (my/git-status)))
                   (message "%s%s%s" path mod-str (if git (format " %s" git) "")))))
-  (dolist (n (number-sequence 1 9))
-    (push `((,(format "SPC %d" n) . nil) . t) which-key-replacement-alist))
-  (push '(("g" . "evil-.*") . t) which-key-replacement-alist)
   (which-key-mode 1))
 
 (use-package general
@@ -453,10 +390,7 @@
     "f" '(project-find-file :which-key "files")
     "F" '(find-file :which-key "file")
     "P" '(project-switch-project :which-key "projects")
-    "b" '(consult-buffer :which-key "buffers")
     "j" '(evil-show-jumps :which-key "jumps")
-
-    "k" '(eldoc-box-help-at-point :which-key "hover")
     "s" '(consult-imenu :which-key "symbols")
     "S" '(xref-find-apropos :which-key "workspace-symbols")
     "d" '(consult-flymake :which-key "diagnostics")
@@ -467,34 +401,22 @@
 
     "'" '(vertico-repeat :which-key "repeat")
     "c" '(evil-commentary-line :which-key "comment")
-    "l" '(toggle-file-lock :which-key "lock")
-    "C" '((lambda () (interactive) (find-file "~/nixos/home.nix")) :which-key "nixos")
+    "C" '((lambda () (interactive) (find-file "~/nixos/linux.nix")) :which-key "nixos")
     "E" '((lambda () (interactive) (find-file "~/.emacs.d/README.org")) :which-key "emacs")
 
-    "p" '((lambda () (interactive)
-            (insert (shell-command-to-string "wl-paste -n"))) :which-key "paste")
+    "p" '(my/clipboard-paste :which-key "paste")
     "y" '((lambda () (interactive)
-            (call-process-region (region-beginning) (region-end) "wl-copy" nil 0)
+            (call-process-region (region-beginning) (region-end)
+                                 (if (eq system-type 'darwin) "pbcopy" "wl-copy") nil 0)
             (evil-exit-visual-state)) :which-key "yank")
     "R" '((lambda () (interactive)
             (delete-region (region-beginning) (region-end))
-            (insert (shell-command-to-string "wl-paste -n"))) :which-key "replace")
+            (insert (my/clipboard-get))) :which-key "replace")
 
     "/" '(consult-ripgrep :which-key "search")
     "?" '(execute-extended-command :which-key "commands")
 
-    "q" '(evil-quit :which-key "quit"))
-
-  (dolist (act (number-sequence 1 9))
-    (dolist (piece (number-sequence 1 9))
-      (let ((fn (pieces--make-binding act piece))
-            (key (format "%d%d" act piece)))
-        (general-define-key
-         :states '(normal visual motion)
-         :keymaps 'override
-         :prefix "SPC"
-         :wk-full-keys nil
-         key `(,fn :which-key nil))))))
+    "q" '(evil-quit :which-key "quit")))
 
 (setq project-switch-commands 'project-find-file)
 
@@ -502,11 +424,19 @@
   :ensure t
   :hook (vterm-mode . evil-insert-state)
   :config
-  (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"
-        vterm-timer-delay 0.01)
+  (setq vterm-timer-delay nil
+        vterm-max-scrollback 5000)
+  (when (eq system-type 'gnu/linux)
+    (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"))
   (define-key vterm-mode-map (kbd "C-c") #'vterm--self-insert)
   (define-key vterm-mode-map (kbd "C-u") #'vterm--self-insert)
-  (define-key vterm-mode-map (kbd "<backtab>") #'vterm-toggle)
+  (define-key vterm-mode-map (kbd "C-y") #'vterm--self-insert)
+  (define-key vterm-mode-map (kbd "C-S-v") #'my/clipboard-paste)
+  (define-key vterm-mode-map (kbd "M-SPC") #'vterm-full-toggle)
+  (define-key vterm-mode-map (kbd "M-S-SPC") #'vterm-toggle)
+  (add-hook 'vterm-mode-hook (lambda ()
+                               (setq-local global-hl-line-mode nil)
+                               (setq-local truncate-lines t)))
   (add-to-list 'display-buffer-alist
                '("\\*vterm\\*"
                  (display-buffer-in-side-window)
@@ -515,37 +445,34 @@
                  (window-height . 0.5))))
 
 (defun vterm-toggle ()
-  "Toggle vterm side window."
+  "Toggle vterm side window. Closes full-frame vterm if open."
   (interactive)
+  (when (and (eq (current-buffer) (get-buffer "*vterm*"))
+             (one-window-p))
+    (previous-buffer))
   (if-let ((win (get-buffer-window "*vterm*")))
       (delete-window win)
     (vterm)))
 
-(defun vterm-full ()
-  "Open vterm in full frame."
+(defun vterm-full-toggle ()
+  "Toggle vterm in full frame. Closes side window if open."
   (interactive)
-  (let ((display-buffer-overriding-action '(display-buffer-same-window)))
-    (vterm))
-  (delete-other-windows))
+  (when-let ((win (get-buffer-window "*vterm*")))
+    (when (window-parameter win 'window-side)
+      (delete-window win)))
+  (if (and (eq (current-buffer) (get-buffer "*vterm*"))
+           (not (window-parameter (selected-window) 'window-side)))
+      (previous-buffer)
+    (let ((display-buffer-overriding-action '(display-buffer-same-window)))
+      (vterm))
+    (delete-other-windows)))
 
 (setq magit-no-confirm '(stage-all-changes unstage-all-changes))
 (use-package magit
   :ensure t
-  :bind ("C-x g" . magit-status)
   :hook (git-commit-mode . evil-insert-state)
   :config
-  (add-hook 'with-editor-post-finish-hook #'delete-window)
-
-  ;; Visit worktree file (editable) with quick magit keys
-  (defun my/magit-visit-file ()
-    (interactive)
-    (call-interactively #'magit-diff-visit-worktree-file-other-window)
-    (evil-local-set-key 'normal "q" (lambda () (interactive) (kill-buffer) (delete-window)))
-    (evil-local-set-key 'normal "B" #'magit-blame))
-
-  (define-key magit-diff-mode-map (kbd "RET") #'my/magit-visit-file)
-  (define-key magit-file-section-map (kbd "RET") #'my/magit-visit-file)
-  (define-key magit-hunk-section-map (kbd "RET") #'my/magit-visit-file))
+  (add-hook 'with-editor-post-finish-hook #'delete-window))
 
 (use-package diff-hl
   :ensure t
@@ -589,11 +516,16 @@
                 (eglot-code-action-organize-imports (point-min) (point-max))))))
 
 (setq python-indent-guess-indent-offset-verbose nil)
-(add-hook 'python-mode-hook 'eglot-ensure)
-(add-hook 'python-ts-mode-hook 'eglot-ensure)
 
-(add-hook 'sh-mode-hook 'eglot-ensure)
-(add-hook 'bash-ts-mode-hook 'eglot-ensure)
+(dolist (hook '(python-mode-hook python-ts-mode-hook
+                sh-mode-hook bash-ts-mode-hook
+                tsx-ts-mode-hook
+                css-mode-hook css-ts-mode-hook
+                json-mode-hook json-ts-mode-hook
+                c-mode-hook c-ts-mode-hook c++-mode-hook c++-ts-mode-hook
+                toml-ts-mode-hook yaml-mode-hook yaml-ts-mode-hook))
+  (add-hook hook 'eglot-ensure))
+
 (use-package web-mode
   :ensure t
   :mode ("\\.html\\'" "\\.jsx\\'" "\\.tsx\\'" "\\.vue\\'")
@@ -610,8 +542,6 @@
   :config
   (setq typescript-indent-level 2))
 
-(add-hook 'tsx-ts-mode-hook 'eglot-ensure)
-
 (use-package js2-mode
   :ensure t
   :mode "\\.js\\'"
@@ -619,20 +549,6 @@
   :config
   (setq js2-basic-offset 2))
 
-(add-hook 'css-mode-hook 'eglot-ensure)
-(add-hook 'css-ts-mode-hook 'eglot-ensure)
-
-(add-hook 'json-mode-hook 'eglot-ensure)
-(add-hook 'json-ts-mode-hook 'eglot-ensure)
-
-(add-hook 'c-mode-hook 'eglot-ensure)
-(add-hook 'c-ts-mode-hook 'eglot-ensure)
-(add-hook 'c++-mode-hook 'eglot-ensure)
-(add-hook 'c++-ts-mode-hook 'eglot-ensure)
-
-(add-hook 'toml-ts-mode-hook 'eglot-ensure)
-(add-hook 'yaml-mode-hook 'eglot-ensure)
-(add-hook 'yaml-ts-mode-hook 'eglot-ensure)
 (use-package lua-mode
   :ensure t
   :hook (lua-mode . eglot-ensure)
@@ -648,16 +564,3 @@
   :config
   (setq treesit-auto-install 'prompt)
   (global-treesit-auto-mode 1))
-
-(defun toggle-file-lock ()
-  "Toggle write permission on current file."
-  (interactive)
-  (if-let ((file (buffer-file-name)))
-      (let* ((modes (file-modes file))
-             (writable (file-writable-p file)))
-        (if writable
-            (set-file-modes file (logand modes #o555))
-          (set-file-modes file (logior modes #o200)))
-        (revert-buffer t t t)
-        (message "File %s" (if writable "locked" "unlocked")))
-    (message "Buffer has no file")))

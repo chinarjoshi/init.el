@@ -46,8 +46,7 @@
           nerd-fonts.inconsolata
           inter
 
-          # Terminal and build tools
-          libvterm
+          # Build tools
           cmake
           gnumake
           gcc
@@ -57,7 +56,8 @@
           fd
         ]
         ++ pkgs.lib.optionals isLinux [
-          pkgs.wl-clipboard  # Wayland clipboard
+          pkgs.libvterm       # vterm module
+          pkgs.wl-clipboard   # Wayland clipboard
         ];
 
         # Custom Emacs with packages

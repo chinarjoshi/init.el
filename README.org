@@ -132,6 +132,16 @@ SPC y / SPC p for explicit system clipboard via wl-copy/wl-paste.
 #+begin_src emacs-lisp
 (setq interprogram-cut-function nil
       interprogram-paste-function nil)
+
+(defun my/clipboard-get ()
+  (shell-command-to-string (if (eq system-type 'darwin) "pbpaste" "wl-paste -n")))
+
+(defun my/clipboard-paste ()
+  (interactive)
+  (let ((content (my/clipboard-get)))
+    (if (derived-mode-p 'vterm-mode)
+        (vterm-send-string content)
+      (insert content))))
 #+end_src
 
 * Writing
@@ -370,11 +380,11 @@ Daily notes.
     "gy" 'eglot-find-typeDefinition
     "gr" 'xref-find-references
     "gi" 'eglot-find-implementation)
-  (evil-define-key 'normal 'global
-    "|" 'notes-open-daily)
+  (global-set-key (kbd "M-\\") 'notes-open-daily)
   (global-set-key (kbd "M-[") 'notes-prev)
   (global-set-key (kbd "M-]") 'notes-next)
-  (global-set-key (kbd "<backtab>") 'vterm-toggle))
+  (global-set-key (kbd "M-SPC") 'vterm-full-toggle)
+  (global-set-key (kbd "M-S-SPC") 'vterm-toggle))
 
 (use-package evil-collection
   :ensure t
@@ -488,17 +498,14 @@ p10k-style git status in echo area.
       "C" '((lambda () (interactive) (find-file "~/nixos/linux.nix")) :which-key "nixos")
       "E" '((lambda () (interactive) (find-file "~/.emacs.d/README.org")) :which-key "emacs")
 
-      "p" '((lambda () (interactive)
-              (insert (shell-command-to-string
-                       (if (eq system-type 'darwin) "pbpaste" "wl-paste -n")))) :which-key "paste")
+      "p" '(my/clipboard-paste :which-key "paste")
       "y" '((lambda () (interactive)
               (call-process-region (region-beginning) (region-end)
                                    (if (eq system-type 'darwin) "pbcopy" "wl-copy") nil 0)
               (evil-exit-visual-state)) :which-key "yank")
       "R" '((lambda () (interactive)
               (delete-region (region-beginning) (region-end))
-              (insert (shell-command-to-string
-                       (if (eq system-type 'darwin) "pbpaste" "wl-paste -n")))) :which-key "replace")
+              (insert (my/clipboard-get))) :which-key "replace")
 
       "/" '(consult-ripgrep :which-key "search")
       "?" '(execute-extended-command :which-key "commands")
@@ -515,11 +522,19 @@ p10k-style git status in echo area.
   :ensure t
   :hook (vterm-mode . evil-insert-state)
   :config
-  (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"
-        vterm-timer-delay 0.01)
+  (setq vterm-timer-delay nil
+        vterm-max-scrollback 5000)
+  (when (eq system-type 'gnu/linux)
+    (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"))
   (define-key vterm-mode-map (kbd "C-c") #'vterm--self-insert)
   (define-key vterm-mode-map (kbd "C-u") #'vterm--self-insert)
-  (define-key vterm-mode-map (kbd "<backtab>") #'vterm-toggle)
+  (define-key vterm-mode-map (kbd "C-y") #'vterm--self-insert)
+  (define-key vterm-mode-map (kbd "C-S-v") #'my/clipboard-paste)
+  (define-key vterm-mode-map (kbd "M-SPC") #'vterm-full-toggle)
+  (define-key vterm-mode-map (kbd "M-S-SPC") #'vterm-toggle)
+  (add-hook 'vterm-mode-hook (lambda ()
+                               (setq-local global-hl-line-mode nil)
+                               (setq-local truncate-lines t)))
   (add-to-list 'display-buffer-alist
                '("\\*vterm\\*"
                  (display-buffer-in-side-window)
@@ -528,18 +543,27 @@ p10k-style git status in echo area.
                  (window-height . 0.5))))
 
 (defun vterm-toggle ()
-  "Toggle vterm side window."
+  "Toggle vterm side window. Closes full-frame vterm if open."
   (interactive)
+  (when (and (eq (current-buffer) (get-buffer "*vterm*"))
+             (one-window-p))
+    (previous-buffer))
   (if-let ((win (get-buffer-window "*vterm*")))
       (delete-window win)
     (vterm)))
 
-(defun vterm-full ()
-  "Open vterm in full frame."
+(defun vterm-full-toggle ()
+  "Toggle vterm in full frame. Closes side window if open."
   (interactive)
-  (let ((display-buffer-overriding-action '(display-buffer-same-window)))
-    (vterm))
-  (delete-other-windows))
+  (when-let ((win (get-buffer-window "*vterm*")))
+    (when (window-parameter win 'window-side)
+      (delete-window win)))
+  (if (and (eq (current-buffer) (get-buffer "*vterm*"))
+           (not (window-parameter (selected-window) 'window-side)))
+      (previous-buffer)
+    (let ((display-buffer-overriding-action '(display-buffer-same-window)))
+      (vterm))
+    (delete-other-windows)))
 #+end_src
 
 ** Git
