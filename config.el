@@ -141,11 +141,6 @@
       (make-directory notes-daily-directory t))
     (find-file file)))
 
-(add-to-list 'command-switch-alist
-             '("--vterm" . (lambda (_) (add-hook 'emacs-startup-hook #'vterm-full))))
-(add-to-list 'command-switch-alist
-             '("--daily" . (lambda (_) (add-hook 'emacs-startup-hook #'notes-open-daily))))
-
 (defun notes--current-time ()
   (when-let* ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
               (parts (split-string name "-")))
