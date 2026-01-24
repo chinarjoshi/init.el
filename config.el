@@ -431,12 +431,16 @@
   (define-key vterm-mode-map (kbd "C-c") #'vterm--self-insert)
   (define-key vterm-mode-map (kbd "C-u") #'vterm--self-insert)
   (define-key vterm-mode-map (kbd "C-y") #'vterm--self-insert)
+  (define-key vterm-mode-map (kbd "C-z") #'vterm--self-insert)
   (define-key vterm-mode-map (kbd "C-S-v") #'my/clipboard-paste)
   (define-key vterm-mode-map (kbd "M-SPC") #'vterm-full-toggle)
   (define-key vterm-mode-map (kbd "M-S-SPC") #'vterm-toggle)
   (add-hook 'vterm-mode-hook (lambda ()
                                (setq-local global-hl-line-mode nil)
                                (setq-local truncate-lines t)))
+  (add-hook 'vterm-set-directory-functions
+            (lambda (dir)
+              (setq-local default-directory dir)))
   (add-to-list 'display-buffer-alist
                '("\\*vterm\\*"
                  (display-buffer-in-side-window)
