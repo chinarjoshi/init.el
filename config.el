@@ -7,6 +7,7 @@
   (package-refresh-contents))
 
 (setq inhibit-startup-echo-area-message "c"
+      inhibit-startup-message t
       server-client-instructions nil)
 
 (setq my/color-black "#000000"
@@ -140,8 +141,10 @@
       (make-directory notes-daily-directory t))
     (find-file file)))
 
-(add-hook 'emacs-startup-hook #'notes-open-daily)
-(add-hook 'server-after-make-frame-hook #'notes-open-daily)
+(add-to-list 'command-switch-alist
+             '("--vterm" . (lambda (_) (add-hook 'emacs-startup-hook #'vterm-full))))
+(add-to-list 'command-switch-alist
+             '("--daily" . (lambda (_) (add-hook 'emacs-startup-hook #'notes-open-daily))))
 
 (defun notes--current-time ()
   (when-let* ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
@@ -497,13 +500,21 @@
   :ensure t
   :hook (vterm-mode . evil-insert-state)
   :config
-  (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes")
+  (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"
+        vterm-timer-delay 0.01)
   (add-to-list 'display-buffer-alist
                '("\\*vterm\\*"
                  (display-buffer-in-side-window)
                  (side . bottom)
                  (slot . 0)
                  (window-height . 0.3))))
+
+(defun vterm-full ()
+  "Open vterm in full frame."
+  (interactive)
+  (let ((display-buffer-overriding-action '(display-buffer-same-window)))
+    (vterm))
+  (delete-other-windows))
 
 (setq magit-no-confirm '(stage-all-changes unstage-all-changes))
 (use-package magit
