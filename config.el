@@ -57,8 +57,10 @@
   (load-theme 'doom-one t)
   (dolist (face '(default fringe line-number line-number-current-line))
     (set-face-attribute face nil :background my/color-black)))
-(setf (cdr (assq 'continuation fringe-indicator-alist)) '(nil nil))
-(setf (cdr (assq 'truncation fringe-indicator-alist)) '(nil nil))
+(when-let ((cell (assq 'continuation fringe-indicator-alist)))
+  (setcdr cell '(nil nil)))
+(when-let ((cell (assq 'truncation fringe-indicator-alist)))
+  (setcdr cell '(nil nil)))
 
 (defun my/set-fonts ()
   (set-face-attribute 'default nil :family my/font-fixed :height my/font-height)
@@ -504,7 +506,7 @@
   :ensure t)
 
 (use-package eglot-booster
-  :vc (:url "https://github.com/jdtsmith/eglot-booster")
+  :ensure t
   :after eglot
   :config
   (eglot-booster-mode))
