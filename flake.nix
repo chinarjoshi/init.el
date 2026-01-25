@@ -61,8 +61,7 @@
         ];
 
         # Custom Emacs with packages
-        # emacs30 (non-macport) may work better with yabai accessibility
-        emacsPackage = if isDarwin then pkgs.emacs30 else pkgs.emacs30-pgtk;
+        emacsPackage = if isDarwin then pkgs.emacs30-macport else pkgs.emacs30-pgtk;
 
         myEmacs = pkgs.emacsWithPackagesFromUsePackage {
           config = ./config.el;
