@@ -426,7 +426,7 @@
   :ensure t
   :hook (vterm-mode . evil-insert-state)
   :config
-  (setq vterm-timer-delay nil
+  (setq vterm-timer-delay 0.01
         vterm-max-scrollback 5000)
   (when (eq system-type 'gnu/linux)
     (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"))
