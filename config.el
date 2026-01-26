@@ -7,7 +7,8 @@
   (package-refresh-contents))
 
 (setq inhibit-startup-echo-area-message "c"
-      server-client-instructions nil)
+      server-client-instructions nil
+      use-package-always-demand t)
 
 (setq my/color-black "#000000"
       my/color-dim "#0a0a0a"
@@ -79,8 +80,11 @@
 (setq interprogram-cut-function nil
       interprogram-paste-function nil)
 
+(defvar my/clipboard-copy-cmd (if (eq system-type 'darwin) "pbcopy" "wl-copy"))
+(defvar my/clipboard-paste-cmd (if (eq system-type 'darwin) "pbpaste" "wl-paste -n"))
+
 (defun my/clipboard-get ()
-  (shell-command-to-string (if (eq system-type 'darwin) "pbpaste" "wl-paste -n")))
+  (shell-command-to-string my/clipboard-paste-cmd))
 
 (defun my/clipboard-paste ()
   (interactive)
@@ -157,21 +161,15 @@
                  (string-to-number (car parts))
                  (string-to-number (format-time-string "%Y")))))
 
-(defun notes-prev ()
-  (interactive)
+(defun notes--navigate (dir)
   (when-let ((time (notes--current-time)))
     (cl-loop for i from 1 to 365
-             for file = (notes--daily-file (time-subtract time (days-to-time i)))
+             for file = (notes--daily-file (funcall dir time (days-to-time i)))
              when (file-exists-p file) return (find-file file)
-             finally (message "No previous note"))))
+             finally (message "No %s note" (if (eq dir #'time-subtract) "previous" "next")))))
 
-(defun notes-next ()
-  (interactive)
-  (when-let ((time (notes--current-time)))
-    (cl-loop for i from 1 to 365
-             for file = (notes--daily-file (time-add time (days-to-time i)))
-             when (file-exists-p file) return (find-file file)
-             finally (message "No next note"))))
+(defun notes-prev () (interactive) (notes--navigate #'time-subtract))
+(defun notes-next () (interactive) (notes--navigate #'time-add))
 
 (defun pieces-search ()
   (interactive)
@@ -409,14 +407,12 @@
     "h" '(xref-find-references :which-key "references")
 
     "'" '(vertico-repeat :which-key "repeat")
-    "c" '(evil-commentary-line :which-key "comment")
-    "C" '((lambda () (interactive) (find-file "~/nixos/linux.nix")) :which-key "nixos")
+    "C" '(evil-commentary-line :which-key "comment")
     "E" '((lambda () (interactive) (find-file "~/.emacs.d/README.org")) :which-key "emacs")
 
     "p" '(my/clipboard-paste :which-key "paste")
     "y" '((lambda () (interactive)
-            (call-process-region (region-beginning) (region-end)
-                                 (if (eq system-type 'darwin) "pbcopy" "wl-copy") nil 0)
+            (call-process-region (region-beginning) (region-end) my/clipboard-copy-cmd nil 0)
             (evil-exit-visual-state)) :which-key "yank")
     "R" '((lambda () (interactive)
             (delete-region (region-beginning) (region-end))
@@ -425,6 +421,7 @@
     "/" '(consult-ripgrep :which-key "search")
     "?" '(execute-extended-command :which-key "commands")
 
+    "c" '(:keymap claude-code-command-map :package claude-code :which-key "claude")
     "q" '(evil-quit :which-key "quit")))
 
 (setq project-switch-commands 'project-find-file)
@@ -438,23 +435,19 @@
         vterm-disable-underline t)
   (when (eq system-type 'gnu/linux)
     (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"))
-  (define-key vterm-mode-map (kbd "C-c") #'vterm--self-insert)
-  (define-key vterm-mode-map (kbd "C-u") #'vterm--self-insert)
-  (define-key vterm-mode-map (kbd "C-y") #'vterm--self-insert)
-  (define-key vterm-mode-map (kbd "C-z") #'vterm--self-insert)
+  (dolist (key '("C-c" "C-u" "C-y" "C-z"))
+    (define-key vterm-mode-map (kbd key) #'vterm--self-insert))
   (define-key vterm-mode-map (kbd "C-S-v") #'my/clipboard-paste)
   (define-key vterm-mode-map (kbd "M-SPC") #'vterm-full-toggle)
   (define-key vterm-mode-map (kbd "M-S-SPC") #'vterm-toggle)
-  ;; Override Evil's C-z in insert state for vterm
   (with-eval-after-load 'evil
     (evil-define-key 'insert vterm-mode-map (kbd "C-z") #'vterm--self-insert))
   (add-hook 'vterm-mode-hook (lambda ()
-                               (setq-local global-hl-line-mode nil)
-                               (setq-local truncate-lines t)
-                               (setq-local bidi-paragraph-direction 'left-to-right)))
+                               (setq-local global-hl-line-mode nil
+                                           truncate-lines t
+                                           bidi-paragraph-direction 'left-to-right)))
   (add-hook 'vterm-set-directory-functions
-            (lambda (dir)
-              (setq-local default-directory dir)))
+            (lambda (dir) (setq-local default-directory dir)))
   (defun vterm--get-color-fixed (index &rest _args)
     "Fixed version that respects face remapping."
     (cond
@@ -485,18 +478,20 @@
 
 (defun vterm--existing-names ()
   "Return list of existing vterm names."
-  (mapcar (lambda (b) (string-remove-prefix "vterm:" (buffer-name b)))
-          (seq-filter (lambda (b) (string-prefix-p "vterm:" (buffer-name b)))
-                      (buffer-list))))
+  (cl-loop for b in (buffer-list)
+           for name = (buffer-name b)
+           when (string-prefix-p "vterm:" name)
+           collect (string-remove-prefix "vterm:" name)))
 
 (defun vterm--read-name ()
   "Prompt for vterm name with completion over existing terminals."
-  (completing-read "Terminal: " (vterm--existing-names) nil nil))
-
-(defun vterm-new (name)
-  "Create a new vterm with NAME."
-  (interactive (list (vterm--read-name)))
-  (vterm (concat "vterm:" name)))
+  (let ((existing (vterm--existing-names)))
+    (cond
+     ;; No frame - use default
+     ((not (frame-list)) "")
+     ;; Prompt with 3s timeout
+     (t (with-timeout (3 "")
+          (completing-read "Terminal: " existing nil nil))))))
 
 (defun vterm--get-or-create (name)
   "Get existing vterm buffer NAME or create new one."
@@ -507,26 +502,20 @@
           (vterm-mode)
           (current-buffer)))))
 
-(defun vterm-toggle ()
-  "Toggle vterm in side window. Close if already in vterm."
-  (interactive)
+(defun vterm--toggle (&optional side)
+  "Toggle vterm. Full frame by default, side window if SIDE is non-nil."
   (if (derived-mode-p 'vterm-mode)
-      (delete-window)
+      (if side (delete-window) (previous-buffer))
     (let ((buf (vterm--get-or-create (vterm--read-name))))
-      (display-buffer-in-side-window buf
-                                     '((side . bottom)
-                                       (slot . 0)
-                                       (window-height . 0.5)))
-      (select-window (get-buffer-window buf)))))
+      (if side
+          (progn
+            (display-buffer-in-side-window buf '((side . bottom) (slot . 0) (window-height . 0.5)))
+            (select-window (get-buffer-window buf)))
+        (pop-to-buffer buf '(display-buffer-same-window))
+        (delete-other-windows)))))
 
-(defun vterm-full-toggle ()
-  "Toggle vterm in full frame. Close if already in vterm."
-  (interactive)
-  (if (derived-mode-p 'vterm-mode)
-      (previous-buffer)
-    (let ((buf (vterm--get-or-create (vterm--read-name))))
-      (pop-to-buffer buf '(display-buffer-same-window))
-      (delete-other-windows))))
+(defun vterm-full-toggle () (interactive) (vterm--toggle))
+(defun vterm-toggle () (interactive) (vterm--toggle t))
 
 (setq magit-no-confirm '(stage-all-changes unstage-all-changes))
 (use-package magit
@@ -566,26 +555,28 @@
   :config
   (eglot-booster-mode))
 
-(use-package go-mode
-  :ensure t
-  :hook ((go-mode go-ts-mode) . eglot-ensure)
-  :config
-  (add-hook 'before-save-hook
-            (lambda ()
-              (when (derived-mode-p 'go-mode 'go-ts-mode)
-                (eglot-format-buffer)
-                (eglot-code-action-organize-imports (point-min) (point-max))))))
+(setq python-indent-guess-indent-offset-verbose nil
+      typescript-indent-level 2
+      js-indent-level 2
+      lua-indent-level 2)
 
-(setq python-indent-guess-indent-offset-verbose nil)
-
-(dolist (hook '(python-mode-hook python-ts-mode-hook
+(dolist (hook '(go-ts-mode-hook
+                python-mode-hook python-ts-mode-hook
                 sh-mode-hook bash-ts-mode-hook
-                tsx-ts-mode-hook
+                typescript-ts-mode-hook tsx-ts-mode-hook
+                js-ts-mode-hook
                 css-mode-hook css-ts-mode-hook
                 json-mode-hook json-ts-mode-hook
                 c-mode-hook c-ts-mode-hook c++-mode-hook c++-ts-mode-hook
+                lua-mode-hook
                 toml-ts-mode-hook yaml-mode-hook yaml-ts-mode-hook))
-  (add-hook hook 'eglot-ensure))
+  (add-hook hook #'eglot-ensure))
+
+(add-hook 'before-save-hook
+          (lambda ()
+            (when (derived-mode-p 'go-ts-mode)
+              (eglot-format-buffer)
+              (eglot-code-action-organize-imports (point-min) (point-max)))))
 
 (use-package web-mode
   :ensure t
@@ -595,26 +586,6 @@
   (setq web-mode-markup-indent-offset 2
         web-mode-css-indent-offset 2
         web-mode-code-indent-offset 2))
-
-(use-package typescript-mode
-  :ensure t
-  :mode "\\.ts\\'"
-  :hook ((typescript-mode typescript-ts-mode) . eglot-ensure)
-  :config
-  (setq typescript-indent-level 2))
-
-(use-package js2-mode
-  :ensure t
-  :mode "\\.js\\'"
-  :hook ((js2-mode js-ts-mode) . eglot-ensure)
-  :config
-  (setq js2-basic-offset 2))
-
-(use-package lua-mode
-  :ensure t
-  :hook (lua-mode . eglot-ensure)
-  :config
-  (setq lua-indent-level 2))
 
 (use-package nix-mode
   :ensure t
@@ -626,9 +597,7 @@
 
 (use-package claude-code
   :ensure t
-  :after vterm
   :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
-  :bind-keymap ("C-c c" . claude-code-command-map)
   :custom
   (claude-code-terminal-backend 'vterm)
   :config

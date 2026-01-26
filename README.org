@@ -29,6 +29,7 @@
   - [[#git][Git]]
   - [[#eglot][Eglot]]
   - [[#languages][Languages]]
+  - [[#claude-code][Claude Code]]
   - [[#treesitter][Treesitter]]
 
 ** Setup MELPA
@@ -42,7 +43,8 @@
   (package-refresh-contents))
 
 (setq inhibit-startup-echo-area-message "c"
-      server-client-instructions nil)
+      server-client-instructions nil
+      use-package-always-demand t)
 #+end_src
 
 ** Configuration
@@ -498,8 +500,7 @@ p10k-style git status in echo area.
       "h" '(xref-find-references :which-key "references")
 
       "'" '(vertico-repeat :which-key "repeat")
-      "c" '(evil-commentary-line :which-key "comment")
-      "C" '((lambda () (interactive) (find-file "~/nixos/linux.nix")) :which-key "nixos")
+      "C" '(evil-commentary-line :which-key "comment")
       "E" '((lambda () (interactive) (find-file "~/.emacs.d/README.org")) :which-key "emacs")
 
       "p" '(my/clipboard-paste :which-key "paste")
@@ -513,6 +514,7 @@ p10k-style git status in echo area.
       "/" '(consult-ripgrep :which-key "search")
       "?" '(execute-extended-command :which-key "commands")
 
+      "c" '(:keymap claude-code-command-map :package claude-code :which-key "claude")
       "q" '(evil-quit :which-key "quit")))
 #+end_src
 
@@ -580,7 +582,13 @@ p10k-style git status in echo area.
 
 (defun vterm--read-name ()
   "Prompt for vterm name with completion over existing terminals."
-  (completing-read "Terminal: " (vterm--existing-names) nil nil))
+  (let ((existing (vterm--existing-names)))
+    (cond
+     ;; No frame - use default
+     ((not (frame-list)) "")
+     ;; Prompt with 3s timeout
+     (t (with-timeout (3 "")
+          (completing-read "Terminal: " existing nil nil))))))
 
 (defun vterm--get-or-create (name)
   "Get existing vterm buffer NAME or create new one."
@@ -698,9 +706,7 @@ p10k-style git status in echo area.
 
 (use-package claude-code
   :ensure t
-  :after vterm
   :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
-  :bind-keymap ("C-c c" . claude-code-command-map)
   :custom
   (claude-code-terminal-backend 'vterm)
   :config
