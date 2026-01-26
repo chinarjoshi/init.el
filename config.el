@@ -44,7 +44,9 @@
       scroll-margin my/scroll-margin
       fast-but-imprecise-scrolling t
       confirm-kill-processes nil
-      confirm-kill-emacs nil)
+      confirm-kill-emacs nil
+      read-process-output-max (* 1024 1024)  ; 1MB for faster subprocess IO
+      gc-cons-threshold (* 100 1024 1024))   ; 100MB to reduce GC pauses
 
 (setq display-line-numbers-width 3)
 (add-hook 'prog-mode-hook 'display-line-numbers-mode)
@@ -240,7 +242,9 @@
   :bind (("C-s" . consult-line)
          ("C-x b" . consult-buffer))
   :config
-  (setq consult-async-min-input my/consult-async-min-input
+  (setq consult-fd-args '((if (executable-find "fdfind") "fdfind" "fd")
+                          "--color=never --full-path")
+        consult-async-min-input my/consult-async-min-input
         consult-async-refresh-delay my/consult-async-delay
         consult-async-input-debounce my/consult-async-debounce
         consult-async-input-throttle my/consult-async-throttle
@@ -263,7 +267,8 @@
   :config
   (setq neo-theme 'nerd-icons
         neo-window-width 30
-        neo-smart-open t))
+        neo-smart-open t
+        neo-show-hidden-files t))
 
 (use-package corfu
   :ensure t
@@ -382,9 +387,11 @@
                   (magit-status)
                 (magit-status (project-prompt-project-dir)))) :which-key "git")
     "\\" '(pieces-search :which-key "pieces")
-    "|" '(restart-emacs :which-key "restart")
+    "|" '(kill-emacs :which-key "restart")
 
-    "." '(consult-fd :which-key "find")
+    "." '((lambda () (interactive) (let ((default-directory "~/")
+                                         (consult-fd-args (concat consult-fd-args " -H")))
+                                     (consult-fd))) :which-key "home")
     "," '(consult-buffer :which-key "buffers")
     ";" '(neotree-toggle :which-key "tree")
     "x" '(scratch-buffer :which-key "scratch")
@@ -426,8 +433,7 @@
   :ensure t
   :hook (vterm-mode . evil-insert-state)
   :config
-  (setq vterm-timer-delay 0.01
-        vterm-max-scrollback 5000)
+  (setq vterm-max-scrollback 5000)
   (when (eq system-type 'gnu/linux)
     (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"))
   (define-key vterm-mode-map (kbd "C-c") #'vterm--self-insert)
@@ -437,9 +443,13 @@
   (define-key vterm-mode-map (kbd "C-S-v") #'my/clipboard-paste)
   (define-key vterm-mode-map (kbd "M-SPC") #'vterm-full-toggle)
   (define-key vterm-mode-map (kbd "M-S-SPC") #'vterm-toggle)
+  ;; Override Evil's C-z in insert state for vterm
+  (with-eval-after-load 'evil
+    (evil-define-key 'insert vterm-mode-map (kbd "C-z") #'vterm--self-insert))
   (add-hook 'vterm-mode-hook (lambda ()
                                (setq-local global-hl-line-mode nil)
-                               (setq-local truncate-lines t)))
+                               (setq-local truncate-lines t)
+                               (setq-local bidi-paragraph-direction 'left-to-right)))
   (add-hook 'vterm-set-directory-functions
             (lambda (dir)
               (setq-local default-directory dir)))
