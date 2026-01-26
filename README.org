@@ -135,8 +135,11 @@ SPC y / SPC p for explicit system clipboard via wl-copy/wl-paste.
 (setq interprogram-cut-function nil
       interprogram-paste-function nil)
 
+(defvar my/clipboard-copy-cmd (if (eq system-type 'darwin) "pbcopy" "wl-copy"))
+(defvar my/clipboard-paste-cmd (if (eq system-type 'darwin) "pbpaste" "wl-paste -n"))
+
 (defun my/clipboard-get ()
-  (shell-command-to-string (if (eq system-type 'darwin) "pbpaste" "wl-paste -n")))
+  (shell-command-to-string my/clipboard-paste-cmd))
 
 (defun my/clipboard-paste ()
   (interactive)
@@ -222,21 +225,15 @@ Daily notes.
                  (string-to-number (car parts))
                  (string-to-number (format-time-string "%Y")))))
 
-(defun notes-prev ()
-  (interactive)
+(defun notes--navigate (dir)
   (when-let ((time (notes--current-time)))
     (cl-loop for i from 1 to 365
-             for file = (notes--daily-file (time-subtract time (days-to-time i)))
+             for file = (notes--daily-file (funcall dir time (days-to-time i)))
              when (file-exists-p file) return (find-file file)
-             finally (message "No previous note"))))
+             finally (message "No %s note" (if (eq dir #'time-subtract) "previous" "next")))))
 
-(defun notes-next ()
-  (interactive)
-  (when-let ((time (notes--current-time)))
-    (cl-loop for i from 1 to 365
-             for file = (notes--daily-file (time-add time (days-to-time i)))
-             when (file-exists-p file) return (find-file file)
-             finally (message "No next note"))))
+(defun notes-prev () (interactive) (notes--navigate #'time-subtract))
+(defun notes-next () (interactive) (notes--navigate #'time-add))
 
 (defun pieces-search ()
   (interactive)
@@ -507,8 +504,7 @@ p10k-style git status in echo area.
 
       "p" '(my/clipboard-paste :which-key "paste")
       "y" '((lambda () (interactive)
-              (call-process-region (region-beginning) (region-end)
-                                   (if (eq system-type 'darwin) "pbcopy" "wl-copy") nil 0)
+              (call-process-region (region-beginning) (region-end) my/clipboard-copy-cmd nil 0)
               (evil-exit-visual-state)) :which-key "yank")
       "R" '((lambda () (interactive)
               (delete-region (region-beginning) (region-end))
@@ -529,55 +525,86 @@ p10k-style git status in echo area.
   :ensure t
   :hook (vterm-mode . evil-insert-state)
   :config
-  (setq vterm-max-scrollback 5000)
+  (setq vterm-max-scrollback 5000
+        vterm-timer-delay 0.01
+        vterm-disable-underline t)
   (when (eq system-type 'gnu/linux)
     (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"))
-  (define-key vterm-mode-map (kbd "C-c") #'vterm--self-insert)
-  (define-key vterm-mode-map (kbd "C-u") #'vterm--self-insert)
-  (define-key vterm-mode-map (kbd "C-y") #'vterm--self-insert)
-  (define-key vterm-mode-map (kbd "C-z") #'vterm--self-insert)
+  (dolist (key '("C-c" "C-u" "C-y" "C-z"))
+    (define-key vterm-mode-map (kbd key) #'vterm--self-insert))
   (define-key vterm-mode-map (kbd "C-S-v") #'my/clipboard-paste)
   (define-key vterm-mode-map (kbd "M-SPC") #'vterm-full-toggle)
   (define-key vterm-mode-map (kbd "M-S-SPC") #'vterm-toggle)
-  ;; Override Evil's C-z in insert state for vterm
   (with-eval-after-load 'evil
     (evil-define-key 'insert vterm-mode-map (kbd "C-z") #'vterm--self-insert))
   (add-hook 'vterm-mode-hook (lambda ()
-                               (setq-local global-hl-line-mode nil)
-                               (setq-local truncate-lines t)
-                               (setq-local bidi-paragraph-direction 'left-to-right)))
+                               (setq-local global-hl-line-mode nil
+                                           truncate-lines t
+                                           bidi-paragraph-direction 'left-to-right)))
   (add-hook 'vterm-set-directory-functions
-            (lambda (dir)
-              (setq-local default-directory dir)))
-  (add-to-list 'display-buffer-alist
-               '("\\*vterm\\*"
-                 (display-buffer-in-side-window)
-                 (side . bottom)
-                 (slot . 0)
-                 (window-height . 0.5))))
+            (lambda (dir) (setq-local default-directory dir)))
+  (defun vterm--get-color-fixed (index &rest _args)
+    "Fixed version that respects face remapping."
+    (cond
+     ((and (>= index 0) (< index 16))
+      (face-foreground (elt vterm-color-palette index) nil 'default))
+     ((= index -11)
+      (face-foreground 'vterm-color-underline nil 'default))
+     ((= index -12)
+      (face-background 'vterm-color-inverse-video nil 'default))
+     (t nil)))
+  (advice-add 'vterm--get-color :override #'vterm--get-color-fixed)
 
-(defun vterm-toggle ()
-  "Toggle vterm side window. Closes full-frame vterm if open."
-  (interactive)
-  (when (and (eq (current-buffer) (get-buffer "*vterm*"))
-             (one-window-p))
-    (previous-buffer))
-  (if-let ((win (get-buffer-window "*vterm*")))
-      (delete-window win)
-    (vterm)))
+  (defvar vterm-hue-counter 0)
+  (defun vterm-random-dark-background ()
+    "Set a rotating hue dark background for the current buffer."
+    (let* ((golden-angle 0.381966)
+           (hue (mod (* vterm-hue-counter golden-angle) 1.0))
+           (sat 0.2)
+           (lum 0.05)
+           (rgb (color-hsl-to-rgb hue sat lum))
+           (color (format "#%02x%02x%02x"
+                          (round (* 255 (nth 0 rgb)))
+                          (round (* 255 (nth 1 rgb)))
+                          (round (* 255 (nth 2 rgb))))))
+      (setq vterm-hue-counter (1+ vterm-hue-counter))
+      (face-remap-add-relative 'default :background color)))
+  (add-hook 'vterm-mode-hook #'vterm-random-dark-background))
 
-(defun vterm-full-toggle ()
-  "Toggle vterm in full frame. Closes side window if open."
-  (interactive)
-  (when-let ((win (get-buffer-window "*vterm*")))
-    (when (window-parameter win 'window-side)
-      (delete-window win)))
-  (if (and (eq (current-buffer) (get-buffer "*vterm*"))
-           (not (window-parameter (selected-window) 'window-side)))
-      (previous-buffer)
-    (let ((display-buffer-overriding-action '(display-buffer-same-window)))
-      (vterm))
-    (delete-other-windows)))
+(defun vterm--existing-names ()
+  "Return list of existing vterm names."
+  (cl-loop for b in (buffer-list)
+           for name = (buffer-name b)
+           when (string-prefix-p "vterm:" name)
+           collect (string-remove-prefix "vterm:" name)))
+
+(defun vterm--read-name ()
+  "Prompt for vterm name with completion over existing terminals."
+  (completing-read "Terminal: " (vterm--existing-names) nil nil))
+
+(defun vterm--get-or-create (name)
+  "Get existing vterm buffer NAME or create new one."
+  (require 'vterm)
+  (let ((buf-name (concat "vterm:" name)))
+    (or (get-buffer buf-name)
+        (with-current-buffer (get-buffer-create buf-name)
+          (vterm-mode)
+          (current-buffer)))))
+
+(defun vterm--toggle (&optional side)
+  "Toggle vterm. Full frame by default, side window if SIDE is non-nil."
+  (if (derived-mode-p 'vterm-mode)
+      (if side (delete-window) (previous-buffer))
+    (let ((buf (vterm--get-or-create (vterm--read-name))))
+      (if side
+          (progn
+            (display-buffer-in-side-window buf '((side . bottom) (slot . 0) (window-height . 0.5)))
+            (select-window (get-buffer-window buf)))
+        (pop-to-buffer buf '(display-buffer-same-window))
+        (delete-other-windows)))))
+
+(defun vterm-full-toggle () (interactive) (vterm--toggle))
+(defun vterm-toggle () (interactive) (vterm--toggle t))
 #+end_src
 
 ** Git
@@ -625,29 +652,29 @@ p10k-style git status in echo area.
 #+end_src
 
 ** Languages
-Configures Eglot for various languages (Go, Python, Shell, Web, C/C++, Lua, Nix).
-
 #+begin_src emacs-lisp
-(use-package go-mode
-  :ensure t
-  :hook ((go-mode go-ts-mode) . eglot-ensure)
-  :config
-  (add-hook 'before-save-hook
-            (lambda ()
-              (when (derived-mode-p 'go-mode 'go-ts-mode)
-                (eglot-format-buffer)
-                (eglot-code-action-organize-imports (point-min) (point-max))))))
+(setq python-indent-guess-indent-offset-verbose nil
+      typescript-indent-level 2
+      js-indent-level 2
+      lua-indent-level 2)
 
-(setq python-indent-guess-indent-offset-verbose nil)
-
-(dolist (hook '(python-mode-hook python-ts-mode-hook
+(dolist (hook '(go-ts-mode-hook
+                python-mode-hook python-ts-mode-hook
                 sh-mode-hook bash-ts-mode-hook
-                tsx-ts-mode-hook
+                typescript-ts-mode-hook tsx-ts-mode-hook
+                js-ts-mode-hook
                 css-mode-hook css-ts-mode-hook
                 json-mode-hook json-ts-mode-hook
                 c-mode-hook c-ts-mode-hook c++-mode-hook c++-ts-mode-hook
+                lua-mode-hook
                 toml-ts-mode-hook yaml-mode-hook yaml-ts-mode-hook))
-  (add-hook hook 'eglot-ensure))
+  (add-hook hook #'eglot-ensure))
+
+(add-hook 'before-save-hook
+          (lambda ()
+            (when (derived-mode-p 'go-ts-mode)
+              (eglot-format-buffer)
+              (eglot-code-action-organize-imports (point-min) (point-max)))))
 
 (use-package web-mode
   :ensure t
@@ -658,29 +685,26 @@ Configures Eglot for various languages (Go, Python, Shell, Web, C/C++, Lua, Nix)
         web-mode-css-indent-offset 2
         web-mode-code-indent-offset 2))
 
-(use-package typescript-mode
-  :ensure t
-  :mode "\\.ts\\'"
-  :hook ((typescript-mode typescript-ts-mode) . eglot-ensure)
-  :config
-  (setq typescript-indent-level 2))
-
-(use-package js2-mode
-  :ensure t
-  :mode "\\.js\\'"
-  :hook ((js2-mode js-ts-mode) . eglot-ensure)
-  :config
-  (setq js2-basic-offset 2))
-
-(use-package lua-mode
-  :ensure t
-  :hook (lua-mode . eglot-ensure)
-  :config
-  (setq lua-indent-level 2))
-
 (use-package nix-mode
   :ensure t
   :mode "\\.nix\\'")
+#+end_src
+
+** Claude Code
+#+begin_src emacs-lisp
+(use-package inheritenv
+  :ensure t
+  :vc (:url "https://github.com/purcell/inheritenv" :rev :newest))
+
+(use-package claude-code
+  :ensure t
+  :after vterm
+  :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
+  :bind-keymap ("C-c c" . claude-code-command-map)
+  :custom
+  (claude-code-terminal-backend 'vterm)
+  :config
+  (claude-code-mode))
 #+end_src
 
 ** Treesitter

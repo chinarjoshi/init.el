@@ -433,7 +433,9 @@
   :ensure t
   :hook (vterm-mode . evil-insert-state)
   :config
-  (setq vterm-max-scrollback 5000)
+  (setq vterm-max-scrollback 5000
+        vterm-timer-delay 0.01
+        vterm-disable-underline t)
   (when (eq system-type 'gnu/linux)
     (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"))
   (define-key vterm-mode-map (kbd "C-c") #'vterm--self-insert)
@@ -453,35 +455,78 @@
   (add-hook 'vterm-set-directory-functions
             (lambda (dir)
               (setq-local default-directory dir)))
-  (add-to-list 'display-buffer-alist
-               '("\\*vterm\\*"
-                 (display-buffer-in-side-window)
-                 (side . bottom)
-                 (slot . 0)
-                 (window-height . 0.5))))
+  (defun vterm--get-color-fixed (index &rest _args)
+    "Fixed version that respects face remapping."
+    (cond
+     ((and (>= index 0) (< index 16))
+      (face-foreground (elt vterm-color-palette index) nil 'default))
+     ((= index -11)
+      (face-foreground 'vterm-color-underline nil 'default))
+     ((= index -12)
+      (face-background 'vterm-color-inverse-video nil 'default))
+     (t nil)))
+  (advice-add 'vterm--get-color :override #'vterm--get-color-fixed)
+
+  (defvar vterm-hue-counter 0)
+  (defun vterm-random-dark-background ()
+    "Set a rotating hue dark background for the current buffer."
+    (let* ((golden-angle 0.381966)
+           (hue (mod (* vterm-hue-counter golden-angle) 1.0))
+           (sat 0.2)
+           (lum 0.05)
+           (rgb (color-hsl-to-rgb hue sat lum))
+           (color (format "#%02x%02x%02x"
+                          (round (* 255 (nth 0 rgb)))
+                          (round (* 255 (nth 1 rgb)))
+                          (round (* 255 (nth 2 rgb))))))
+      (setq vterm-hue-counter (1+ vterm-hue-counter))
+      (face-remap-add-relative 'default :background color)))
+  (add-hook 'vterm-mode-hook #'vterm-random-dark-background))
+
+(defun vterm--existing-names ()
+  "Return list of existing vterm names."
+  (mapcar (lambda (b) (string-remove-prefix "vterm:" (buffer-name b)))
+          (seq-filter (lambda (b) (string-prefix-p "vterm:" (buffer-name b)))
+                      (buffer-list))))
+
+(defun vterm--read-name ()
+  "Prompt for vterm name with completion over existing terminals."
+  (completing-read "Terminal: " (vterm--existing-names) nil nil))
+
+(defun vterm-new (name)
+  "Create a new vterm with NAME."
+  (interactive (list (vterm--read-name)))
+  (vterm (concat "vterm:" name)))
+
+(defun vterm--get-or-create (name)
+  "Get existing vterm buffer NAME or create new one."
+  (require 'vterm)
+  (let ((buf-name (concat "vterm:" name)))
+    (or (get-buffer buf-name)
+        (with-current-buffer (get-buffer-create buf-name)
+          (vterm-mode)
+          (current-buffer)))))
 
 (defun vterm-toggle ()
-  "Toggle vterm side window. Closes full-frame vterm if open."
+  "Toggle vterm in side window. Close if already in vterm."
   (interactive)
-  (when (and (eq (current-buffer) (get-buffer "*vterm*"))
-             (one-window-p))
-    (previous-buffer))
-  (if-let ((win (get-buffer-window "*vterm*")))
-      (delete-window win)
-    (vterm)))
+  (if (derived-mode-p 'vterm-mode)
+      (delete-window)
+    (let ((buf (vterm--get-or-create (vterm--read-name))))
+      (display-buffer-in-side-window buf
+                                     '((side . bottom)
+                                       (slot . 0)
+                                       (window-height . 0.5)))
+      (select-window (get-buffer-window buf)))))
 
 (defun vterm-full-toggle ()
-  "Toggle vterm in full frame. Closes side window if open."
+  "Toggle vterm in full frame. Close if already in vterm."
   (interactive)
-  (when-let ((win (get-buffer-window "*vterm*")))
-    (when (window-parameter win 'window-side)
-      (delete-window win)))
-  (if (and (eq (current-buffer) (get-buffer "*vterm*"))
-           (not (window-parameter (selected-window) 'window-side)))
+  (if (derived-mode-p 'vterm-mode)
       (previous-buffer)
-    (let ((display-buffer-overriding-action '(display-buffer-same-window)))
-      (vterm))
-    (delete-other-windows)))
+    (let ((buf (vterm--get-or-create (vterm--read-name))))
+      (pop-to-buffer buf '(display-buffer-same-window))
+      (delete-other-windows))))
 
 (setq magit-no-confirm '(stage-all-changes unstage-all-changes))
 (use-package magit
@@ -574,6 +619,20 @@
 (use-package nix-mode
   :ensure t
   :mode "\\.nix\\'")
+
+(use-package inheritenv
+  :ensure t
+  :vc (:url "https://github.com/purcell/inheritenv" :rev :newest))
+
+(use-package claude-code
+  :ensure t
+  :after vterm
+  :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
+  :bind-keymap ("C-c c" . claude-code-command-map)
+  :custom
+  (claude-code-terminal-backend 'vterm)
+  :config
+  (claude-code-mode))
 
 (use-package treesit-auto
   :ensure t
