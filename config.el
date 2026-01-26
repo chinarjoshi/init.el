@@ -26,8 +26,8 @@
       my/scroll-conservatively 101
       my/olivetti-width 80
       my/vertico-count 15
-      my/corfu-delay 0.2
-      my/corfu-prefix 3
+      my/corfu-delay 0
+      my/corfu-prefix 1
       my/consult-async-min-input 0
       my/consult-async-delay 0.1
       my/consult-async-debounce 0.05
@@ -543,7 +543,8 @@
   (add-to-list 'eglot-server-programs '(toml-ts-mode . ("taplo" "lsp" "stdio")))
   (add-to-list 'eglot-server-programs '(yaml-mode . ("yaml-language-server" "--stdio")))
   (add-to-list 'eglot-server-programs '(yaml-ts-mode . ("yaml-language-server" "--stdio")))
-  (setq eglot-report-progress nil)
+  (setq eglot-report-progress nil
+        eglot-send-changes-idle-time 0)
   (advice-add 'eglot--message :override #'ignore))
 
 (use-package eldoc-box
@@ -574,9 +575,11 @@
 
 (add-hook 'before-save-hook
           (lambda ()
-            (when (derived-mode-p 'go-ts-mode)
-              (eglot-format-buffer)
-              (eglot-code-action-organize-imports (point-min) (point-max)))))
+            (when (and (derived-mode-p 'go-ts-mode)
+                       (not (seq-find (lambda (d) (= 1 (flymake-diagnostic-type d)))
+                                      (flymake-diagnostics))))
+              (ignore-errors (eglot-format-buffer))
+              (ignore-errors (eglot-code-action-organize-imports (point-min) (point-max))))))
 
 (use-package web-mode
   :ensure t

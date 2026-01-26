@@ -65,8 +65,8 @@
       my/scroll-conservatively 101
       my/olivetti-width 80
       my/vertico-count 15
-      my/corfu-delay 0.2
-      my/corfu-prefix 3
+      my/corfu-delay 0
+      my/corfu-prefix 1
       my/consult-async-min-input 0
       my/consult-async-delay 0.1
       my/consult-async-debounce 0.05
@@ -202,15 +202,18 @@ SPC y / SPC p for explicit system clipboard via wl-copy/wl-paste.
 #+end_src
 
 ** Notes
-Daily notes.
+Daily and weekly notes.
 
 #+begin_src emacs-lisp
-;; TODO: migrate to org
 (defvar notes-directory "~/notes")
 (defvar notes-daily-directory (expand-file-name "periodic/daily" notes-directory))
+(defvar notes-weekly-directory (expand-file-name "periodic/weekly" notes-directory))
 
 (defun notes--daily-file (time)
-  (expand-file-name (format-time-string "%m-%d.md" time) notes-daily-directory))
+  (expand-file-name (format-time-string "%m-%d.org" time) notes-daily-directory))
+
+(defun notes--weekly-file (time)
+  (expand-file-name (format-time-string "%Y-W%W.org" time) notes-weekly-directory))
 
 (defun notes-open-daily ()
   (interactive)
@@ -219,7 +222,14 @@ Daily notes.
       (make-directory notes-daily-directory t))
     (find-file file)))
 
-(defun notes--current-time ()
+(defun notes-open-weekly ()
+  (interactive)
+  (let ((file (notes--weekly-file (current-time))))
+    (unless (file-exists-p notes-weekly-directory)
+      (make-directory notes-weekly-directory t))
+    (find-file file)))
+
+(defun notes--daily-current-time ()
   (when-let* ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
               (parts (split-string name "-")))
     (encode-time 0 0 0
@@ -227,15 +237,31 @@ Daily notes.
                  (string-to-number (car parts))
                  (string-to-number (format-time-string "%Y")))))
 
-(defun notes--navigate (dir)
-  (when-let ((time (notes--current-time)))
+(defun notes--weekly-current-time ()
+  (when-let* ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
+              ((string-match "\\([0-9]+\\)-W\\([0-9]+\\)" name)))
+    (let ((year (string-to-number (match-string 1 name)))
+          (week (string-to-number (match-string 2 name))))
+      (encode-time 0 0 0 (1+ (* 7 week)) 1 year))))
+
+(defun notes--navigate-daily (dir)
+  (when-let ((time (notes--daily-current-time)))
     (cl-loop for i from 1 to 365
              for file = (notes--daily-file (funcall dir time (days-to-time i)))
              when (file-exists-p file) return (find-file file)
-             finally (message "No %s note" (if (eq dir #'time-subtract) "previous" "next")))))
+             finally (message "No %s daily note" (if (eq dir #'time-subtract) "previous" "next")))))
 
-(defun notes-prev () (interactive) (notes--navigate #'time-subtract))
-(defun notes-next () (interactive) (notes--navigate #'time-add))
+(defun notes--navigate-weekly (dir)
+  (when-let ((time (notes--weekly-current-time)))
+    (cl-loop for i from 1 to 52
+             for file = (notes--weekly-file (funcall dir time (days-to-time (* 7 i))))
+             when (file-exists-p file) return (find-file file)
+             finally (message "No %s weekly note" (if (eq dir #'time-subtract) "previous" "next")))))
+
+(defun notes-prev () (interactive) (notes--navigate-daily #'time-subtract))
+(defun notes-next () (interactive) (notes--navigate-daily #'time-add))
+(defun notes-weekly-prev () (interactive) (notes--navigate-weekly #'time-subtract))
+(defun notes-weekly-next () (interactive) (notes--navigate-weekly #'time-add))
 
 (defun pieces-search ()
   (interactive)
@@ -319,7 +345,7 @@ Daily notes.
           consult-async-refresh-delay my/consult-async-delay
           consult-async-input-debounce my/consult-async-debounce
           consult-async-input-throttle my/consult-async-throttle
-          consult-buffer-filter '("\\`\\*" "\\` " "\\`[0-9]\\{2\\}-[0-9]\\{2\\}\\.md\\'")))
+          consult-buffer-filter '("\\`\\*" "\\` " "\\`[0-9]\\{2\\}-[0-9]\\{2\\}\\.org\\'")))
 #+end_src
 
 ** Navigation
@@ -387,6 +413,9 @@ Daily notes.
   (global-set-key (kbd "M-\\") 'notes-open-daily)
   (global-set-key (kbd "M-[") 'notes-prev)
   (global-set-key (kbd "M-]") 'notes-next)
+  (global-set-key (kbd "M-|") 'notes-open-weekly)
+  (global-set-key (kbd "M-{") 'notes-weekly-prev)
+  (global-set-key (kbd "M-}") 'notes-weekly-next)
   (global-set-key (kbd "M-SPC") 'vterm-full-toggle)
   (global-set-key (kbd "M-S-SPC") 'vterm-toggle))
 
@@ -646,7 +675,8 @@ p10k-style git status in echo area.
   (add-to-list 'eglot-server-programs '(toml-ts-mode . ("taplo" "lsp" "stdio")))
   (add-to-list 'eglot-server-programs '(yaml-mode . ("yaml-language-server" "--stdio")))
   (add-to-list 'eglot-server-programs '(yaml-ts-mode . ("yaml-language-server" "--stdio")))
-  (setq eglot-report-progress nil)
+  (setq eglot-report-progress nil
+        eglot-send-changes-idle-time 0)
   (advice-add 'eglot--message :override #'ignore))
 
 (use-package eldoc-box
@@ -680,9 +710,11 @@ p10k-style git status in echo area.
 
 (add-hook 'before-save-hook
           (lambda ()
-            (when (derived-mode-p 'go-ts-mode)
-              (eglot-format-buffer)
-              (eglot-code-action-organize-imports (point-min) (point-max)))))
+            (when (and (derived-mode-p 'go-ts-mode)
+                       (not (seq-find (lambda (d) (= 1 (flymake-diagnostic-type d)))
+                                      (flymake-diagnostics))))
+              (ignore-errors (eglot-format-buffer))
+              (ignore-errors (eglot-code-action-organize-imports (point-min) (point-max))))))
 
 (use-package web-mode
   :ensure t
