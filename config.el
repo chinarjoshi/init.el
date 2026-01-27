@@ -47,7 +47,8 @@
       confirm-kill-processes nil
       confirm-kill-emacs nil
       read-process-output-max (* 1024 1024)  ; 1MB for faster subprocess IO
-      gc-cons-threshold (* 100 1024 1024))   ; 100MB to reduce GC pauses
+      gc-cons-threshold (* 100 1024 1024)    ; 100MB to reduce GC pauses
+      explicit-shell-file-name "/bin/bash") ; zsh-syntax-highlighting breaks eat
 
 (setq display-line-numbers-width 3)
 (add-hook 'prog-mode-hook 'display-line-numbers-mode)
@@ -139,12 +140,15 @@
    '(("@\\([a-zA-Z_][a-zA-Z0-9_]*\\)(\\([^)]*\\))"
       (0 'org-macro t)))))
 
-;; TODO: migrate to org
 (defvar notes-directory "~/notes")
 (defvar notes-daily-directory (expand-file-name "periodic/daily" notes-directory))
+(defvar notes-weekly-directory (expand-file-name "periodic/weekly" notes-directory))
 
 (defun notes--daily-file (time)
-  (expand-file-name (format-time-string "%m-%d.md" time) notes-daily-directory))
+  (expand-file-name (format-time-string "%m-%d.org" time) notes-daily-directory))
+
+(defun notes--weekly-file (time)
+  (expand-file-name (format-time-string "%Y-W%W.org" time) notes-weekly-directory))
 
 (defun notes-open-daily ()
   (interactive)
@@ -153,7 +157,14 @@
       (make-directory notes-daily-directory t))
     (find-file file)))
 
-(defun notes--current-time ()
+(defun notes-open-weekly ()
+  (interactive)
+  (let ((file (notes--weekly-file (current-time))))
+    (unless (file-exists-p notes-weekly-directory)
+      (make-directory notes-weekly-directory t))
+    (find-file file)))
+
+(defun notes--daily-current-time ()
   (when-let* ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
               (parts (split-string name "-")))
     (encode-time 0 0 0
@@ -161,15 +172,31 @@
                  (string-to-number (car parts))
                  (string-to-number (format-time-string "%Y")))))
 
-(defun notes--navigate (dir)
-  (when-let ((time (notes--current-time)))
+(defun notes--weekly-current-time ()
+  (when-let* ((name (file-name-sans-extension (file-name-nondirectory buffer-file-name)))
+              ((string-match "\\([0-9]+\\)-W\\([0-9]+\\)" name)))
+    (let ((year (string-to-number (match-string 1 name)))
+          (week (string-to-number (match-string 2 name))))
+      (encode-time 0 0 0 (1+ (* 7 week)) 1 year))))
+
+(defun notes--navigate-daily (dir)
+  (when-let ((time (notes--daily-current-time)))
     (cl-loop for i from 1 to 365
              for file = (notes--daily-file (funcall dir time (days-to-time i)))
              when (file-exists-p file) return (find-file file)
-             finally (message "No %s note" (if (eq dir #'time-subtract) "previous" "next")))))
+             finally (message "No %s daily note" (if (eq dir #'time-subtract) "previous" "next")))))
 
-(defun notes-prev () (interactive) (notes--navigate #'time-subtract))
-(defun notes-next () (interactive) (notes--navigate #'time-add))
+(defun notes--navigate-weekly (dir)
+  (when-let ((time (notes--weekly-current-time)))
+    (cl-loop for i from 1 to 52
+             for file = (notes--weekly-file (funcall dir time (days-to-time (* 7 i))))
+             when (file-exists-p file) return (find-file file)
+             finally (message "No %s weekly note" (if (eq dir #'time-subtract) "previous" "next")))))
+
+(defun notes-prev () (interactive) (notes--navigate-daily #'time-subtract))
+(defun notes-next () (interactive) (notes--navigate-daily #'time-add))
+(defun notes-weekly-prev () (interactive) (notes--navigate-weekly #'time-subtract))
+(defun notes-weekly-next () (interactive) (notes--navigate-weekly #'time-add))
 
 (defun pieces-search ()
   (interactive)
@@ -246,7 +273,7 @@
         consult-async-refresh-delay my/consult-async-delay
         consult-async-input-debounce my/consult-async-debounce
         consult-async-input-throttle my/consult-async-throttle
-        consult-buffer-filter '("\\`\\*" "\\` " "\\`[0-9]\\{2\\}-[0-9]\\{2\\}\\.md\\'")))
+        consult-buffer-filter '("\\`\\*" "\\` " "\\`[0-9]\\{2\\}-[0-9]\\{2\\}\\.org\\'")))
 
 (use-package avy
   :ensure t
@@ -304,6 +331,9 @@
   (global-set-key (kbd "M-\\") 'notes-open-daily)
   (global-set-key (kbd "M-[") 'notes-prev)
   (global-set-key (kbd "M-]") 'notes-next)
+  (global-set-key (kbd "M-|") 'notes-open-weekly)
+  (global-set-key (kbd "M-{") 'notes-weekly-prev)
+  (global-set-key (kbd "M-}") 'notes-weekly-next)
   (global-set-key (kbd "M-SPC") 'vterm-full-toggle)
   (global-set-key (kbd "M-S-SPC") 'vterm-toggle))
 
@@ -430,7 +460,8 @@
   :ensure t
   :hook (vterm-mode . evil-insert-state)
   :config
-  (setq vterm-max-scrollback 5000
+  (setq vterm-shell "/bin/zsh"
+        vterm-max-scrollback 5000
         vterm-timer-delay 0.01
         vterm-disable-underline t)
   (when (eq system-type 'gnu/linux)
@@ -598,11 +629,19 @@
   :ensure t
   :vc (:url "https://github.com/purcell/inheritenv" :rev :newest))
 
+(use-package eat
+  :ensure t
+  :config
+  (setq eat-minimum-latency 0.001
+        eat-maximum-latency 0.01
+        process-adaptive-read-buffering t)
+  (define-key eat-semi-char-mode-map (kbd "C-u") #'eat-self-input))
+
 (use-package claude-code
   :ensure t
   :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
   :custom
-  (claude-code-terminal-backend 'vterm)
+  (claude-code-terminal-backend 'eat)
   :config
   (claude-code-mode))
 

@@ -92,7 +92,8 @@ Silences save prompts on quit.
       confirm-kill-processes nil
       confirm-kill-emacs nil
       read-process-output-max (* 1024 1024)  ; 1MB for faster subprocess IO
-      gc-cons-threshold (* 100 1024 1024))   ; 100MB to reduce GC pauses
+      gc-cons-threshold (* 100 1024 1024)    ; 100MB to reduce GC pauses
+      explicit-shell-file-name "/bin/bash") ; zsh-syntax-highlighting breaks eat
 #+end_src
 
 ** UI
@@ -556,7 +557,8 @@ p10k-style git status in echo area.
   :ensure t
   :hook (vterm-mode . evil-insert-state)
   :config
-  (setq vterm-max-scrollback 5000
+  (setq vterm-shell "/bin/zsh"
+        vterm-max-scrollback 5000
         vterm-timer-delay 0.01
         vterm-disable-underline t)
   (when (eq system-type 'gnu/linux)
@@ -736,11 +738,19 @@ p10k-style git status in echo area.
   :ensure t
   :vc (:url "https://github.com/purcell/inheritenv" :rev :newest))
 
+(use-package eat
+  :ensure t
+  :config
+  (setq eat-minimum-latency 0.001
+        eat-maximum-latency 0.01
+        process-adaptive-read-buffering t)
+  (define-key eat-semi-char-mode-map (kbd "C-u") #'eat-self-input))
+
 (use-package claude-code
   :ensure t
   :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
   :custom
-  (claude-code-terminal-backend 'vterm)
+  (claude-code-terminal-backend 'eat)
   :config
   (claude-code-mode))
 #+end_src
