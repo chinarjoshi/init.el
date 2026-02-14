@@ -236,6 +236,11 @@
   :ensure t
   :hook (org-mode . org-fragtog-mode))
 
+(use-package snap
+  :ensure t
+  :vc (:url "https://github.com/chinarjoshi/snap" :rev :newest :lisp-dir "emacs")
+  :hook (org-mode . snap-mode))
+
 (use-package vertico
   :ensure t
   :config
@@ -319,7 +324,8 @@
         evil-disable-insert-state-bindings t
         evil-split-window-below t
         evil-vsplit-window-right t
-        evil-insert-state-cursor 'bar)
+        evil-insert-state-cursor 'bar
+        evil-echo-state nil)
   (blink-cursor-mode -1)
   :config
   (evil-mode 1)
