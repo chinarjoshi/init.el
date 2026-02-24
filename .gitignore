@@ -1,4 +1,5 @@
-config.el
+*.el
+!init.el
 eln-cache/
 *~
 +*+
