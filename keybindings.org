@@ -236,6 +236,8 @@ p10k-style git status in echo area.
 (evil-set-leader '(normal visual motion) (kbd "SPC"))
 (evil-define-key '(normal visual motion) 'global (kbd "<leader>") leader-map)
 
-(with-eval-after-load 'claude-code
-  (keymap-set leader-map "c" claude-code-command-map))
+(use-package claude-code
+  :ensure t
+  :vc (:url "https://github.com/stevemolitor/claude-code.el")
+  :bind (:map leader-map ("c" . claude-code-command-map)))
 #+end_src
