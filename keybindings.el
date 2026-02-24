@@ -32,8 +32,7 @@
   (global-set-key (kbd "M-|") 'notes-open-weekly)
   (global-set-key (kbd "M-{") 'notes-weekly-prev)
   (global-set-key (kbd "M-}") 'notes-weekly-next)
-  (global-set-key (kbd "M-SPC") 'vterm-full-toggle)
-  (global-set-key (kbd "M-S-SPC") 'vterm-toggle)
+  (global-set-key (kbd "M-SPC") 'vterm)
 
   ;; Unbind macOS defaults so Hammerspoon gets Cmd+h/j/l
   (global-unset-key (kbd "s-h"))
@@ -41,8 +40,9 @@
   (global-unset-key (kbd "s-l"))
 
   ;; Kitty-style keybindings (Cmd key)
-  (global-set-key (kbd "s-t") 'scratch-buffer)
+  (global-set-key (kbd "s-t") (lambda () (interactive) (vterm t)))
   (global-set-key (kbd "s-w") 'kill-current-buffer)
+  (global-set-key (kbd "s-D") 'kill-current-buffer)
   (global-set-key (kbd "s-}") 'tab-line-switch-to-next-tab)
   (global-set-key (kbd "s-{") 'tab-line-switch-to-prev-tab)
   (global-set-key (kbd "s-n") 'make-frame-command)
@@ -75,6 +75,19 @@
       which-key-prefix-prefix ""
       which-key-echo-keystrokes 0)
 (which-key-mode 1)
+
+;; Clean up which-key display names globally
+(push '((nil . "^evil-")          . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^my/")            . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^consult-")       . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^eglot-")         . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^xref-find-")     . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^project-")       . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^flymake-")       . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^magit-")         . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^tab-line-")      . (nil . "")) which-key-replacement-alist)
+(push '((nil . "-mode$")          . (nil . "")) which-key-replacement-alist)
+(push '((nil . "\\-")             . (nil . " ")) which-key-replacement-alist)
 
 (defun my/git-status ()
   "Get p10k-style git status string."
@@ -168,6 +181,35 @@
   "/"  #'consult-ripgrep
   "?"  #'execute-extended-command
   "q"  #'evil-quit)
+
+(which-key-add-keymap-based-replacements leader-map
+  "SPC" "git"
+  "\\" "pieces"
+  "|"  "reload"
+  "."  "find home"
+  ","  "buffers"
+  ";"  "tree"
+  "x"  "scratch"
+  "f"  "find file"
+  "F"  "find any"
+  "P"  "project"
+  "j"  "jumps"
+  "s"  "symbols"
+  "S"  "workspace symbols"
+  "d"  "diagnostics"
+  "D"  "project diagnostics"
+  "r"  "recent"
+  "a"  "actions"
+  "h"  "references"
+  "'"  "resume"
+  "C"  "comment"
+  "E"  "config"
+  "p"  "paste"
+  "y"  "yank"
+  "R"  "replace"
+  "/"  "ripgrep"
+  "?"  "command"
+  "q"  "quit")
 
 (evil-set-leader '(normal visual motion) (kbd "SPC"))
 (evil-define-key '(normal visual motion) 'global (kbd "<leader>") leader-map)

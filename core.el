@@ -83,6 +83,8 @@
               (width . ,(frame-parameter f 'width))
               (height . ,(frame-parameter f 'height)))))))
 
+(add-to-list 'default-frame-alist '(undecorated . t))
+
 (defun my/restore-frame-geometry (frame)
   "Restore saved position and size to new frame, and raise it."
   (with-selected-frame frame

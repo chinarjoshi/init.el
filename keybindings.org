@@ -36,8 +36,7 @@
   (global-set-key (kbd "M-|") 'notes-open-weekly)
   (global-set-key (kbd "M-{") 'notes-weekly-prev)
   (global-set-key (kbd "M-}") 'notes-weekly-next)
-  (global-set-key (kbd "M-SPC") 'vterm-full-toggle)
-  (global-set-key (kbd "M-S-SPC") 'vterm-toggle)
+  (global-set-key (kbd "M-SPC") 'vterm)
 
   ;; Unbind macOS defaults so Hammerspoon gets Cmd+h/j/l
   (global-unset-key (kbd "s-h"))
@@ -45,8 +44,9 @@
   (global-unset-key (kbd "s-l"))
 
   ;; Kitty-style keybindings (Cmd key)
-  (global-set-key (kbd "s-t") 'scratch-buffer)
+  (global-set-key (kbd "s-t") (lambda () (interactive) (vterm t)))
   (global-set-key (kbd "s-w") 'kill-current-buffer)
+  (global-set-key (kbd "s-D") 'kill-current-buffer)
   (global-set-key (kbd "s-}") 'tab-line-switch-to-next-tab)
   (global-set-key (kbd "s-{") 'tab-line-switch-to-prev-tab)
   (global-set-key (kbd "s-n") 'make-frame-command)
@@ -84,6 +84,19 @@ p10k-style git status in echo area.
       which-key-prefix-prefix ""
       which-key-echo-keystrokes 0)
 (which-key-mode 1)
+
+;; Clean up which-key display names globally
+(push '((nil . "^evil-")          . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^my/")            . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^consult-")       . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^eglot-")         . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^xref-find-")     . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^project-")       . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^flymake-")       . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^magit-")         . (nil . "")) which-key-replacement-alist)
+(push '((nil . "^tab-line-")      . (nil . "")) which-key-replacement-alist)
+(push '((nil . "-mode$")          . (nil . "")) which-key-replacement-alist)
+(push '((nil . "\\-")             . (nil . " ")) which-key-replacement-alist)
 
 (defun my/git-status ()
   "Get p10k-style git status string."
@@ -123,6 +136,12 @@ p10k-style git status in echo area.
   (my/load-modules)
   (message "Config reloaded"))
 
+(defun my/restart-daemon ()
+  "Retangle config and kill daemon for a clean restart."
+  (interactive)
+  (my/load-modules)
+  (kill-emacs))
+
 (defun my/magit-status ()
   (interactive)
   (if (project-current)
@@ -153,33 +172,64 @@ p10k-style git status in echo area.
   (insert (my/clipboard-get)))
 
 (defvar-keymap leader-map
+  "'"   #'vertico-repeat
+  ","   #'consult-buffer
+  "."   #'my/find-home
+  "/"   #'consult-ripgrep
+  ";"   #'neotree-toggle
+  "?"   #'execute-extended-command
+  "\\"  #'pieces-search
+  "|"   #'my/reload-config
+  "C-|" #'my/restart-daemon
   "SPC" #'my/magit-status
-  "\\" #'pieces-search
-  "|"  #'my/reload-config
-  "."  #'my/find-home
-  ","  #'consult-buffer
-  ";"  #'neotree-toggle
-  "x"  #'scratch-buffer
-  "f"  #'project-find-file
-  "F"  #'find-file
-  "P"  #'project-switch-project
-  "j"  #'evil-show-jumps
-  "s"  #'consult-imenu
-  "S"  #'xref-find-apropos
-  "d"  #'consult-flymake
-  "D"  #'flymake-show-project-diagnostics
-  "r"  #'consult-recent-file
-  "a"  #'eglot-code-actions
-  "h"  #'xref-find-references
-  "'"  #'vertico-repeat
-  "C"  #'comment-line
-  "E"  #'my/edit-config
-  "p"  #'my/clipboard-paste
-  "y"  #'my/yank-to-clipboard
-  "R"  #'my/replace-from-clipboard
-  "/"  #'consult-ripgrep
-  "?"  #'execute-extended-command
-  "q"  #'evil-quit)
+  "C"   #'comment-line
+  "D"   #'flymake-show-project-diagnostics
+  "E"   #'my/edit-config
+  "F"   #'find-file
+  "P"   #'project-switch-project
+  "R"   #'my/replace-from-clipboard
+  "S"   #'xref-find-apropos
+  "a"   #'eglot-code-actions
+  "d"   #'consult-flymake
+  "f"   #'project-find-file
+  "h"   #'xref-find-references
+  "j"   #'evil-show-jumps
+  "p"   #'my/clipboard-paste
+  "q"   #'evil-quit
+  "r"   #'consult-recent-file
+  "s"   #'consult-imenu
+  "x"   #'scratch-buffer
+  "y"   #'my/yank-to-clipboard)
+
+(which-key-add-keymap-based-replacements leader-map
+  "'"   "resume"
+  ","   "buffers"
+  "."   "find home"
+  "/"   "ripgrep"
+  ";"   "tree"
+  "?"   "command"
+  "\\"  "pieces"
+  "|"   "reload"
+  "C-|" "restart daemon"
+  "SPC" "git"
+  "C"   "comment"
+  "D"   "project diagnostics"
+  "E"   "config"
+  "F"   "find any"
+  "P"   "project"
+  "R"   "replace"
+  "S"   "workspace symbols"
+  "a"   "actions"
+  "d"   "diagnostics"
+  "f"   "find file"
+  "h"   "references"
+  "j"   "jumps"
+  "p"   "paste"
+  "q"   "quit"
+  "r"   "recent"
+  "s"   "symbols"
+  "x"   "scratch"
+  "y"   "yank")
 
 (evil-set-leader '(normal visual motion) (kbd "SPC"))
 (evil-define-key '(normal visual motion) 'global (kbd "<leader>") leader-map)

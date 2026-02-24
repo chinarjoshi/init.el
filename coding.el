@@ -15,8 +15,7 @@
   (dolist (key '("C-c" "C-u" "C-y" "C-z"))
     (define-key vterm-mode-map (kbd key) #'vterm--self-insert))
   (define-key vterm-mode-map (kbd "C-S-v") #'my/clipboard-paste)
-  (define-key vterm-mode-map (kbd "M-SPC") #'vterm-full-toggle)
-  (define-key vterm-mode-map (kbd "M-S-SPC") #'vterm-toggle)
+  (define-key vterm-mode-map (kbd "M-SPC") #'vterm)
   (with-eval-after-load 'evil
     (evil-define-key 'insert vterm-mode-map (kbd "C-z") #'vterm--self-insert)
     ;; ESC goes to terminal, not normal mode. C-\ for copy mode (scroll/search/copy).
@@ -57,32 +56,6 @@
       (setq vterm-hue-counter (1+ vterm-hue-counter))
       (face-remap-add-relative 'default :background color)))
   (add-hook 'vterm-mode-hook #'vterm-random-dark-background))
-
-(defun my/vterm-find-existing ()
-  "Find most recent existing vterm buffer, or nil."
-  (cl-find-if (lambda (b) (with-current-buffer b (derived-mode-p 'vterm-mode)))
-              (buffer-list)))
-
-(defun my/vterm-new ()
-  "Create a new vterm buffer named after cwd."
-  (require 'vterm)
-  (let ((vterm-buffer-name (concat "vterm:" (abbreviate-file-name default-directory))))
-    (vterm t)))
-
-(defun my/vterm-toggle (&optional side)
-  "Toggle vterm. Full frame by default, side window if SIDE is non-nil."
-  (if (derived-mode-p 'vterm-mode)
-      (if side (delete-window) (previous-buffer))
-    (let ((buf (or (my/vterm-find-existing) (my/vterm-new))))
-      (if side
-          (progn
-            (display-buffer-in-side-window buf '((side . bottom) (slot . 0) (window-height . 0.5)))
-            (select-window (get-buffer-window buf)))
-        (pop-to-buffer buf '(display-buffer-same-window))
-        (delete-other-windows)))))
-
-(defun vterm-full-toggle () (interactive) (my/vterm-toggle))
-(defun vterm-toggle () (interactive) (my/vterm-toggle t))
 
 (setq magit-no-confirm '(stage-all-changes unstage-all-changes))
 (use-package magit
