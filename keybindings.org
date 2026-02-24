@@ -44,14 +44,13 @@
                   ("M-]"             . notes-next)
                   ("M-{"             . notes-weekly-prev)
                   ("M-}"             . notes-weekly-next)
-                  ("M-SPC"           . vterm)
+                  ("M-SPC"           . my/vterm-new)
                   ;; Kitty-style (Cmd key)
                   ("s-t"             . my/vterm-new)
                   ("s-w"             . kill-current-buffer)
                   ("s-D"             . my/force-kill-buffer)
                   ("s-n"             . make-frame-command)
                   ("s-|"             . my/restart-daemon)
-                  ("s-\\"            . pieces-search)
                   ("s-}"             . tab-line-switch-to-next-tab)
                   ("s-{"             . tab-line-switch-to-prev-tab)
                   ("C-<tab>"         . tab-line-switch-to-next-tab)
@@ -184,7 +183,6 @@ p10k-style git status in echo area.
   "/"   #'consult-ripgrep
   ";"   #'neotree-toggle
   "?"   #'execute-extended-command
-  "|"   #'my/reload-config
   "SPC" #'my/magit-status
   "C"   #'comment-line
   "D"   #'flymake-show-project-diagnostics
@@ -212,7 +210,6 @@ p10k-style git status in echo area.
   "/"   "ripgrep"
   ";"   "tree"
   "?"   "command"
-  "|"   "reload"
   "SPC" "git"
   "C"   "comment"
   "D"   "project diagnostics"
@@ -235,6 +232,7 @@ p10k-style git status in echo area.
 
 (evil-set-leader '(normal visual motion) (kbd "SPC"))
 (evil-define-key '(normal visual motion) 'global (kbd "<leader>") leader-map)
+(global-set-key (kbd "C-SPC") leader-map)
 
 (use-package claude-code
   :ensure t

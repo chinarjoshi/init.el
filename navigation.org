@@ -9,18 +9,16 @@
   :config
   (vertico-mode 1)
   (setq vertico-count my/vertico-count
-        vertico-resize nil
-        vertico-sort-function #'vertico-sort-history-length-alpha)
+        vertico-resize nil)
   (require 'vertico-repeat)
   (add-hook 'minibuffer-setup-hook #'vertico-repeat-save))
 
-(use-package orderless
+(use-package hotfuzz
   :ensure t
   :config
-  (setq completion-styles '(orderless basic)
+  (setq completion-styles '(hotfuzz)
         completion-category-overrides nil
-        completion-category-defaults nil
-        orderless-matching-styles '(orderless-literal orderless-initialism orderless-flex)))
+        completion-category-defaults nil))
 
 (use-package marginalia
   :ensure t
@@ -42,7 +40,8 @@
         consult-async-refresh-delay my/consult-async-delay
         consult-async-input-debounce my/consult-async-debounce
         consult-async-input-throttle my/consult-async-throttle
-        consult-buffer-filter '("\\`\\*" "\\` " "\\`[0-9]\\{2\\}-[0-9]\\{2\\}\\.org\\'")))
+        consult-buffer-filter '("\\`\\*" "\\` " "\\`[0-9]\\{2\\}-[0-9]\\{2\\}\\.org\\'")
+        consult-preview-key nil))
 #+end_src
 
 * Navigation
@@ -86,10 +85,11 @@
                                magit-diff-mode magit-log-mode
                                help-mode completion-list-mode))
 
-(set-face-attribute 'tab-line nil :background my/color-black :foreground "#555555" :box nil)
-(set-face-attribute 'tab-line-tab nil :background my/color-dim :foreground "#ffffff" :box nil)
-(set-face-attribute 'tab-line-tab-inactive nil :background my/color-black :foreground "#555555" :box nil)
-(set-face-attribute 'tab-line-tab-current nil :background my/color-dim :foreground "#ffffff" :box nil)
+(let ((bg (doom-color 'bg-alt)))
+  (set-face-attribute 'tab-line nil :background bg :box nil)
+  (set-face-attribute 'tab-line-tab nil :background bg :box nil)
+  (set-face-attribute 'tab-line-tab-inactive nil :background bg :box nil)
+  (set-face-attribute 'tab-line-tab-current nil :background bg :box nil))
 
 (global-tab-line-mode 1)
 
@@ -108,6 +108,18 @@
         neo-window-width 30
         neo-smart-open t
         neo-show-hidden-files t))
+#+end_src
+
+* Indent Bars
+#+begin_src emacs-lisp
+(use-package indent-bars
+  :ensure t
+  :hook (prog-mode . indent-bars-mode)
+  :config
+  (setq indent-bars-color '(shadow :face-bg nil :blend 0.3)
+        indent-bars-prefer-character t
+        indent-bars-starting-column 0
+        indent-bars-char ?\│))
 #+end_src
 
 * In-buffer Completion

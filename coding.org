@@ -23,7 +23,6 @@
   (define-key vterm-mode-map (kbd "M-SPC") #'vterm)
   (with-eval-after-load 'evil
     (evil-define-key 'insert vterm-mode-map (kbd "C-z") #'vterm--self-insert)
-    ;; ESC goes to terminal, not normal mode. C-\ for copy mode (scroll/search/copy).
     (evil-define-key 'insert vterm-mode-map (kbd "<escape>") #'vterm--self-insert)
     (evil-define-key 'insert vterm-mode-map (kbd "C-\\") #'vterm-copy-mode))
   (add-hook 'vterm-mode-hook (lambda ()
@@ -87,8 +86,22 @@
 
 (add-hook 'eglot-managed-mode-hook #'eglot-inlay-hints-mode)
 (add-hook 'eglot-managed-mode-hook #'flymake-mode)
+(add-hook 'eglot-managed-mode-hook
+          (lambda () (add-hook 'before-save-hook #'eglot-format-buffer nil t)))
+
+(use-package symbol-overlay
+  :ensure t
+  :hook (prog-mode . symbol-overlay-mode))
 (setq eldoc-echo-area-use-multiline-p nil)
-(setq flymake-fringe-indicator-position nil)
+(with-eval-after-load 'flymake
+  (setq flymake-fringe-indicator-position nil
+        flymake-error-bitmap nil
+        flymake-warning-bitmap nil
+        flymake-note-bitmap nil))
+(with-eval-after-load 'eglot
+  (put 'eglot-error 'flymake-bitmap nil)
+  (put 'eglot-warning 'flymake-bitmap nil)
+  (put 'eglot-note 'flymake-bitmap nil))
 
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-server-programs '(toml-ts-mode . ("taplo" "lsp" "stdio")))
@@ -100,9 +113,14 @@
 
 (use-package eldoc-box
   :ensure t
-  :hook (eglot-managed-mode . eldoc-box-hover-mode)
+  :hook (eglot-managed-mode . eldoc-box-hover-at-point-mode)
   :config
-  (setq eldoc-box-max-pixel-width 0))
+  (setq eldoc-box-clear-with-C-g t)
+  (set-face-attribute 'eldoc-box-body nil
+                      :background (doom-color 'bg-alt)
+                      :foreground (doom-color 'fg))
+  (set-face-attribute 'eldoc-box-border nil
+                      :background (doom-color 'base3)))
 
 (use-package eglot-booster
   :ensure t
