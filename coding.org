@@ -83,10 +83,11 @@
 
 * Eglot
 #+begin_src emacs-lisp
+(setq project-vc-extra-root-markers '("go.mod" "Cargo.toml" "package.json" "pyproject.toml"))
+
 (add-hook 'eglot-managed-mode-hook #'eglot-inlay-hints-mode)
 (add-hook 'eglot-managed-mode-hook #'flymake-mode)
-(setq eldoc-echo-area-use-multiline-p nil
-      eldoc-display-functions '(eldoc-display-in-buffer))
+(setq eldoc-echo-area-use-multiline-p nil)
 (setq flymake-fringe-indicator-position nil)
 
 (with-eval-after-load 'eglot
@@ -98,7 +99,9 @@
   (advice-add 'eglot--message :override #'ignore))
 
 (use-package eldoc-box
-  :ensure t)
+  :ensure t
+  :config
+  (setq eldoc-display-functions '(eldoc-box-help-at-point)))
 
 (use-package eglot-booster
   :ensure t

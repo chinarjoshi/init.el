@@ -13,6 +13,15 @@
 (setq inhibit-startup-echo-area-message "c"
       server-client-instructions nil
       use-package-always-demand t)
+
+;; Add nix profile to PATH so LSP servers and tools are found
+(dolist (dir `("~/.local/bin" "~/.cargo/bin"
+              ,(format "/etc/profiles/per-user/%s/bin" (user-login-name))
+              "/run/current-system/sw/bin"))
+  (let ((expanded (expand-file-name dir)))
+    (when (file-directory-p expanded)
+      (add-to-list 'exec-path expanded)
+      (setenv "PATH" (concat expanded ":" (getenv "PATH"))))))
 #+end_src
 
 * Variables

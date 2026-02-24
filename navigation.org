@@ -118,8 +118,7 @@
   (setq corfu-auto t
         corfu-auto-delay my/corfu-delay
         corfu-auto-prefix my/corfu-prefix)
-  (global-corfu-mode 1)
-  (add-hook 'org-mode-hook (lambda () (corfu-mode -1))))
+  (add-hook 'eglot-managed-mode-hook #'corfu-mode))
 
 (use-package cape
   :ensure t

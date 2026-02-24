@@ -30,31 +30,35 @@
     (comment-or-uncomment-region beg end))
   (evil-define-key 'normal 'global "gc" 'my/comment)
 
-  (global-set-key (kbd "M-\\") 'notes-open-daily)
-  (global-set-key (kbd "M-[") 'notes-prev)
-  (global-set-key (kbd "M-]") 'notes-next)
-  (global-set-key (kbd "M-|") 'notes-open-weekly)
-  (global-set-key (kbd "M-{") 'notes-weekly-prev)
-  (global-set-key (kbd "M-}") 'notes-weekly-next)
-  (global-set-key (kbd "M-SPC") 'vterm)
-
   ;; Unbind macOS defaults so Hammerspoon gets Cmd+h/j/l
-  (global-unset-key (kbd "s-h"))
-  (global-unset-key (kbd "s-j"))
-  (global-unset-key (kbd "s-l"))
+  (dolist (k '("s-h" "s-j" "s-l")) (global-unset-key (kbd k)))
 
-  ;; Kitty-style keybindings (Cmd key)
-  (global-set-key (kbd "s-t") (lambda () (interactive) (vterm t)))
-  (global-set-key (kbd "s-w") 'kill-current-buffer)
-  (global-set-key (kbd "s-D") (lambda () (interactive)
-                                (let ((kill-buffer-query-functions nil))
-                                  (kill-current-buffer))))
-  (global-set-key (kbd "s-}") 'tab-line-switch-to-next-tab)
-  (global-set-key (kbd "s-{") 'tab-line-switch-to-prev-tab)
-  (global-set-key (kbd "s-n") 'make-frame-command)
-  (global-set-key (kbd "C-<tab>") 'tab-line-switch-to-next-tab)
-  (global-set-key (kbd "C-<iso-lefttab>") 'tab-line-switch-to-prev-tab)
-  (global-set-key (kbd "C-S-<tab>") 'tab-line-switch-to-prev-tab)
+  (defun my/vterm-new () (interactive) (vterm t))
+  (defun my/force-kill-buffer () (interactive)
+    (let ((kill-buffer-query-functions nil)) (kill-current-buffer)))
+
+  (dolist (bind '(;; Notes (Alt key)
+                  ("M-\\"            . notes-open-daily)
+                  ("M-|"             . notes-open-weekly)
+                  ("M-["             . notes-prev)
+                  ("M-]"             . notes-next)
+                  ("M-{"             . notes-weekly-prev)
+                  ("M-}"             . notes-weekly-next)
+                  ("M-SPC"           . vterm)
+                  ;; Kitty-style (Cmd key)
+                  ("s-t"             . my/vterm-new)
+                  ("s-w"             . kill-current-buffer)
+                  ("s-D"             . my/force-kill-buffer)
+                  ("s-n"             . make-frame-command)
+                  ("s-|"             . my/restart-daemon)
+                  ("s-\\"            . pieces-search)
+                  ("s-}"             . tab-line-switch-to-next-tab)
+                  ("s-{"             . tab-line-switch-to-prev-tab)
+                  ("C-<tab>"         . tab-line-switch-to-next-tab)
+                  ("C-S-<tab>"       . tab-line-switch-to-prev-tab)
+                  ("C-<iso-lefttab>" . tab-line-switch-to-prev-tab)))
+    (global-set-key (kbd (car bind)) (cdr bind)))
+
   (dotimes (i 9)
     (global-set-key (kbd (format "s-%d" (1+ i)))
                     (let ((n i)) (lambda () (interactive)
@@ -180,9 +184,7 @@ p10k-style git status in echo area.
   "/"   #'consult-ripgrep
   ";"   #'neotree-toggle
   "?"   #'execute-extended-command
-  "\\"  #'pieces-search
   "|"   #'my/reload-config
-  "C-|" #'my/restart-daemon
   "SPC" #'my/magit-status
   "C"   #'comment-line
   "D"   #'flymake-show-project-diagnostics
@@ -210,9 +212,7 @@ p10k-style git status in echo area.
   "/"   "ripgrep"
   ";"   "tree"
   "?"   "command"
-  "\\"  "pieces"
   "|"   "reload"
-  "C-|" "restart daemon"
   "SPC" "git"
   "C"   "comment"
   "D"   "project diagnostics"
