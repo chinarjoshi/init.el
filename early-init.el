@@ -14,7 +14,8 @@
         (menu-bar-lines . 0)
         (tool-bar-lines . 0)
         (vertical-scroll-bars)
-        (undecorated . t)
+        (width . 90)
+        (height . 50)
         (font . "Inconsolata Nerd Font-13")))
 
 ;; Disable mode-line early

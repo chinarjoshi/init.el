@@ -1,14 +1,20 @@
 ;;; init.el --- Bootstrap literate config -*- lexical-binding: t -*-
 
-(defvar my/config-file (expand-file-name "README.org" user-emacs-directory))
-(defvar my/tangled-file (expand-file-name "config.el" user-emacs-directory))
+(defvar my/modules '("core" "writing" "navigation" "keybindings" "coding"))
 
-(when (or (not (file-exists-p my/tangled-file))
-          (file-newer-than-file-p my/config-file my/tangled-file))
-  (require 'org)
-  (org-babel-tangle-file my/config-file my/tangled-file))
+(defun my/load-modules ()
+  "Tangle and load all config modules whose .org is newer than .el."
+  (dolist (mod my/modules)
+    (let ((org-file (expand-file-name (concat mod ".org") user-emacs-directory))
+          (el-file (expand-file-name (concat mod ".el") user-emacs-directory)))
+      (when (or (not (file-exists-p el-file))
+                (file-newer-than-file-p org-file el-file))
+        (require 'org)
+        (org-babel-tangle-file org-file el-file))
+      (load el-file nil t))))
 
-(load my/tangled-file nil t)
+(my/load-modules)
+
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.

@@ -1,0 +1,117 @@
+;;; navigation.el --- Completion, search, file tree -*- lexical-binding: t -*-
+
+(use-package vertico
+  :ensure t
+  :config
+  (vertico-mode 1)
+  (setq vertico-count my/vertico-count
+        vertico-resize nil
+        vertico-sort-function #'vertico-sort-history-length-alpha)
+  (require 'vertico-repeat)
+  (add-hook 'minibuffer-setup-hook #'vertico-repeat-save))
+
+(use-package orderless
+  :ensure t
+  :config
+  (setq completion-styles '(orderless basic)
+        completion-category-overrides nil
+        completion-category-defaults nil
+        orderless-matching-styles '(orderless-literal orderless-initialism orderless-flex)))
+
+(use-package marginalia
+  :ensure t
+  :config
+  (marginalia-mode 1))
+
+(setq recentf-save-file "~/.cache/emacs/recentf")
+(make-directory "~/.cache/emacs" t)
+(recentf-mode 1)
+
+(use-package consult
+  :ensure t
+  :bind (("C-s" . consult-line)
+         ("C-x b" . consult-buffer))
+  :config
+  (setq consult-fd-args '((if (executable-find "fdfind") "fdfind" "fd")
+                          "--color=never --full-path")
+        consult-async-min-input my/consult-async-min-input
+        consult-async-refresh-delay my/consult-async-delay
+        consult-async-input-debounce my/consult-async-debounce
+        consult-async-input-throttle my/consult-async-throttle
+        consult-buffer-filter '("\\`\\*" "\\` " "\\`[0-9]\\{2\\}-[0-9]\\{2\\}\\.org\\'")))
+
+(use-package avy
+  :ensure t
+  :after evil
+  :config
+  (setq avy-timeout-seconds 0.3)
+  (evil-define-key 'normal 'global "s" 'avy-goto-char-timer)
+  (evil-define-key 'normal 'global "m" 'avy-move-line))
+
+(use-package nerd-icons
+  :ensure t)
+
+(use-package nerd-icons-completion
+  :ensure t
+  :after (nerd-icons marginalia)
+  :config
+  (nerd-icons-completion-mode 1)
+  (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
+
+(defun my/tab-line-tab-name (buffer &optional _buffers)
+  "Tab name with nerd-icon and modified marker."
+  (with-current-buffer buffer
+    (let* ((name (buffer-name buffer))
+           (icon (if (buffer-file-name buffer)
+                     (nerd-icons-icon-for-file (buffer-file-name buffer))
+                   (nerd-icons-icon-for-buffer)))
+           (mod (if (and (buffer-modified-p buffer)
+                         (buffer-file-name buffer))
+                    (propertize " ●" 'face `(:foreground ,my/color-yellow)) "")))
+      (concat " " icon " " name mod " "))))
+
+(require 'tab-line)
+(setq tab-line-new-button-show nil
+      tab-line-close-button-show nil
+      tab-line-separator ""
+      tab-line-tab-name-function #'my/tab-line-tab-name
+      tab-line-exclude-modes '(magit-mode magit-status-mode
+                               magit-diff-mode magit-log-mode
+                               help-mode completion-list-mode))
+
+(set-face-attribute 'tab-line nil :background my/color-black :foreground "#555555" :box nil)
+(set-face-attribute 'tab-line-tab nil :background my/color-dim :foreground "#ffffff" :box nil)
+(set-face-attribute 'tab-line-tab-inactive nil :background my/color-black :foreground "#555555" :box nil)
+(set-face-attribute 'tab-line-tab-current nil :background my/color-dim :foreground "#ffffff" :box nil)
+
+(global-tab-line-mode 1)
+
+(defun my/tab-line-select-nth (n)
+  "Switch to Nth visible tab (0-indexed)."
+  (let* ((tabs (tab-line-tabs-window-buffers))
+         (bufs (seq-filter #'bufferp tabs)))
+    (when (< n (length bufs))
+      (switch-to-buffer (nth n bufs)))))
+
+(use-package neotree
+  :ensure t
+  :after nerd-icons
+  :config
+  (setq neo-theme 'nerd-icons
+        neo-window-width 30
+        neo-smart-open t
+        neo-show-hidden-files t))
+
+(use-package corfu
+  :ensure t
+  :config
+  (setq corfu-auto t
+        corfu-auto-delay my/corfu-delay
+        corfu-auto-prefix my/corfu-prefix)
+  (global-corfu-mode 1)
+  (add-hook 'org-mode-hook (lambda () (corfu-mode -1))))
+
+(use-package cape
+  :ensure t
+  :init
+  (add-to-list 'completion-at-point-functions #'cape-file))

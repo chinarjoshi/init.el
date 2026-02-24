@@ -1,0 +1,176 @@
+;;; keybindings.el --- Evil, which-key, leader -*- lexical-binding: t -*-
+
+(use-package evil
+  :ensure t
+  :init
+  (setq evil-want-C-u-scroll t
+        evil-want-Y-yank-to-eol t
+        evil-want-keybinding nil
+        evil-undo-system 'undo-redo
+        evil-disable-insert-state-bindings t
+        evil-split-window-below t
+        evil-vsplit-window-right t
+        evil-normal-state-cursor `(box ,my/color-cyan)
+        evil-echo-state nil)
+  (blink-cursor-mode -1)
+  :config
+  (evil-mode 1)
+  (evil-define-key 'normal 'global
+    "gd" 'xref-find-definitions
+    "gy" 'eglot-find-typeDefinition
+    "gr" 'xref-find-references
+    "gi" 'eglot-find-implementation
+    "K" 'eldoc-box-help-at-point)
+
+  (evil-define-operator my/comment (beg end)
+    (comment-or-uncomment-region beg end))
+  (evil-define-key 'normal 'global "gc" 'my/comment)
+
+  (global-set-key (kbd "M-\\") 'notes-open-daily)
+  (global-set-key (kbd "M-[") 'notes-prev)
+  (global-set-key (kbd "M-]") 'notes-next)
+  (global-set-key (kbd "M-|") 'notes-open-weekly)
+  (global-set-key (kbd "M-{") 'notes-weekly-prev)
+  (global-set-key (kbd "M-}") 'notes-weekly-next)
+  (global-set-key (kbd "M-SPC") 'vterm-full-toggle)
+  (global-set-key (kbd "M-S-SPC") 'vterm-toggle)
+
+  ;; Unbind macOS defaults so Hammerspoon gets Cmd+h/j/l
+  (global-unset-key (kbd "s-h"))
+  (global-unset-key (kbd "s-j"))
+  (global-unset-key (kbd "s-l"))
+
+  ;; Kitty-style keybindings (Cmd key)
+  (global-set-key (kbd "s-t") 'scratch-buffer)
+  (global-set-key (kbd "s-w") 'kill-current-buffer)
+  (global-set-key (kbd "s-}") 'tab-line-switch-to-next-tab)
+  (global-set-key (kbd "s-{") 'tab-line-switch-to-prev-tab)
+  (global-set-key (kbd "s-n") 'make-frame-command)
+  (global-set-key (kbd "C-<tab>") 'tab-line-switch-to-next-tab)
+  (global-set-key (kbd "C-<iso-lefttab>") 'tab-line-switch-to-prev-tab)
+  (global-set-key (kbd "C-S-<tab>") 'tab-line-switch-to-prev-tab)
+  (dotimes (i 9)
+    (global-set-key (kbd (format "s-%d" (1+ i)))
+                    (let ((n i)) (lambda () (interactive)
+                                   (my/tab-line-select-nth n))))))
+
+(use-package evil-collection
+  :ensure t
+  :after evil
+  :config
+  (evil-collection-init))
+
+(use-package evil-surround
+  :ensure t
+  :after evil
+  :config
+  (global-evil-surround-mode 1))
+
+(require 'which-key)
+(setq which-key-idle-delay 0
+      which-key-popup-type 'side-window
+      which-key-side-window-location 'bottom
+      which-key-side-window-max-height 0.3
+      which-key-show-prefix 'echo
+      which-key-prefix-prefix ""
+      which-key-echo-keystrokes 0)
+(which-key-mode 1)
+
+(defun my/git-status ()
+  "Get p10k-style git status string."
+  (when-let* ((file (buffer-file-name))
+              ((vc-backend file))
+              (branch (car (vc-git-branches)))
+              (default-directory (file-name-directory file))
+              (out (shell-command-to-string "git status --porcelain -b 2>/dev/null")))
+    (let ((ahead 0) (behind 0) (staged 0) (unstaged 0))
+      (dolist (line (split-string out "\n" t))
+        (cond
+         ((string-match "ahead \\([0-9]+\\)" line) (setq ahead (string-to-number (match-string 1 line))))
+         ((string-match "behind \\([0-9]+\\)" line) (setq behind (string-to-number (match-string 1 line))))
+         ((string-match "^[MADRC]" line) (setq staged (1+ staged)))
+         ((string-match "^.[MADRC]" line) (setq unstaged (1+ unstaged)))))
+      (concat (propertize branch 'face `(:foreground ,my/color-cyan))
+              (if (> ahead 0) (propertize (format " ↑%d" ahead) 'face `(:foreground ,my/color-green)) "")
+              (if (> behind 0) (propertize (format " ↓%d" behind) 'face `(:foreground ,my/color-yellow)) "")
+              (if (> staged 0) (propertize (format " +%d" staged) 'face `(:foreground ,my/color-green)) "")
+              (if (> unstaged 0) (propertize (format " !%d" unstaged) 'face `(:foreground ,my/color-red)) "")))))
+
+(advice-add 'which-key--echo :override
+            (lambda (&rest _)
+              (let* ((path (propertize (abbreviate-file-name (or (buffer-file-name) (buffer-name)))
+                                       'face `(:foreground ,my/color-blue)))
+                     (mod (cond (buffer-read-only " %%") ((buffer-modified-p) " *") (t nil)))
+                     (mod-str (if mod (propertize mod 'face `(:foreground ,my/color-yellow)) ""))
+                     (git (my/git-status)))
+                (message "%s%s%s" path mod-str (if git (format " %s" git) "")))))
+
+(defun my/reload-config ()
+  "Retangle and reload all config modules."
+  (interactive)
+  (my/load-modules)
+  (message "Config reloaded"))
+
+(defun my/magit-status ()
+  (interactive)
+  (if (project-current)
+      (magit-status)
+    (magit-status (project-prompt-project-dir))))
+
+(defun my/find-home ()
+  (interactive)
+  (let ((default-directory "~/")
+        (consult-fd-args (append consult-fd-args '("-H"))))
+    (consult-fd)))
+
+(defun my/edit-config ()
+  (interactive)
+  (let* ((dir "~/.emacs.d/")
+         (files (directory-files dir nil "\\.org$"))
+         (selected (completing-read "Config: " files nil t)))
+    (find-file (expand-file-name selected dir))))
+
+(defun my/yank-to-clipboard ()
+  (interactive)
+  (call-process-region (region-beginning) (region-end) my/clipboard-copy-cmd nil 0)
+  (evil-exit-visual-state))
+
+(defun my/replace-from-clipboard ()
+  (interactive)
+  (delete-region (region-beginning) (region-end))
+  (insert (my/clipboard-get)))
+
+(defvar-keymap leader-map
+  "SPC" #'my/magit-status
+  "\\" #'pieces-search
+  "|"  #'my/reload-config
+  "."  #'my/find-home
+  ","  #'consult-buffer
+  ";"  #'neotree-toggle
+  "x"  #'scratch-buffer
+  "f"  #'project-find-file
+  "F"  #'find-file
+  "P"  #'project-switch-project
+  "j"  #'evil-show-jumps
+  "s"  #'consult-imenu
+  "S"  #'xref-find-apropos
+  "d"  #'consult-flymake
+  "D"  #'flymake-show-project-diagnostics
+  "r"  #'consult-recent-file
+  "a"  #'eglot-code-actions
+  "h"  #'xref-find-references
+  "'"  #'vertico-repeat
+  "C"  #'comment-line
+  "E"  #'my/edit-config
+  "p"  #'my/clipboard-paste
+  "y"  #'my/yank-to-clipboard
+  "R"  #'my/replace-from-clipboard
+  "/"  #'consult-ripgrep
+  "?"  #'execute-extended-command
+  "q"  #'evil-quit)
+
+(evil-set-leader '(normal visual motion) (kbd "SPC"))
+(evil-define-key '(normal visual motion) 'global (kbd "<leader>") leader-map)
+
+(with-eval-after-load 'claude-code
+  (keymap-set leader-map "c" claude-code-command-map))
