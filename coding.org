@@ -100,8 +100,9 @@
 
 (use-package eldoc-box
   :ensure t
+  :hook (eglot-managed-mode . eldoc-box-hover-mode)
   :config
-  (setq eldoc-display-functions '(eldoc-box-help-at-point)))
+  (setq eldoc-box-max-pixel-width 0))
 
 (use-package eglot-booster
   :ensure t
