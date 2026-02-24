@@ -13,13 +13,8 @@
   (setq vterm-shell "/bin/zsh"
         vterm-max-scrollback 5000
         vterm-timer-delay 0.01
-        vterm-disable-underline t)
-  (defun my/short-dir (dir)
-    (let ((parts (split-string (abbreviate-file-name dir) "/" t)))
-      (concat (mapconcat #'identity (last parts 2) "/") "/")))
-  (advice-add 'vterm :before
-    (lambda (&rest _)
-      (setq vterm-buffer-name (concat "*" (my/short-dir default-directory) "*"))))
+        vterm-disable-underline t
+        vterm-buffer-name-string "%s")
   (when (eq system-type 'gnu/linux)
     (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"))
   (dolist (key '("C-c" "C-u" "C-y" "C-z"))
@@ -36,9 +31,7 @@
                                            truncate-lines t
                                            bidi-paragraph-direction 'left-to-right)))
   (add-hook 'vterm-set-directory-functions
-            (lambda (dir)
-              (setq-local default-directory dir)
-              (rename-buffer (concat "*" (my/short-dir dir) "*") t)))
+            (lambda (dir) (setq-local default-directory dir)))
   (defun vterm--get-color-fixed (index &rest _args)
     "Fixed version that respects face remapping."
     (cond
