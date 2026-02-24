@@ -1,4 +1,4 @@
-#+property: header-args:emacs-lisp :tangle writing.el
+#+property: header-args:emacs-lisp :tangle config.el
 
 * Org
 #+begin_src emacs-lisp

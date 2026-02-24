@@ -1,4 +1,4 @@
-#+property: header-args:emacs-lisp :tangle navigation.el
+#+property: header-args:emacs-lisp :tangle config.el
 
 * Completion
 #+begin_src emacs-lisp
