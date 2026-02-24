@@ -1,19 +1,17 @@
 ;;; init.el --- Bootstrap literate config -*- lexical-binding: t -*-
 
 (defvar my/modules '("core" "writing" "navigation" "keybindings" "coding"))
-(defvar my/config-file (expand-file-name "config.el" user-emacs-directory))
 
 (defun my/load-modules ()
-  "Tangle all config modules into config.el and load it."
-  (let* ((org-files (mapcar (lambda (m) (expand-file-name (concat m ".org") user-emacs-directory)) my/modules))
-         (needs-tangle (or (not (file-exists-p my/config-file))
-                           (cl-some (lambda (f) (file-newer-than-file-p f my/config-file)) org-files))))
-    (when needs-tangle
-      (require 'org)
-      (delete-file my/config-file nil)
-      (dolist (f org-files)
-        (org-babel-tangle-file f my/config-file)))
-    (load my/config-file nil t)))
+  "Tangle and load all config modules whose .org is newer than .el."
+  (dolist (mod my/modules)
+    (let ((org-file (expand-file-name (concat mod ".org") user-emacs-directory))
+          (el-file (expand-file-name (concat mod ".el") user-emacs-directory)))
+      (when (or (not (file-exists-p el-file))
+                (file-newer-than-file-p org-file el-file))
+        (require 'org)
+        (org-babel-tangle-file org-file el-file))
+      (load el-file nil t))))
 
 (my/load-modules)
 
