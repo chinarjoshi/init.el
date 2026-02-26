@@ -35,7 +35,7 @@
          ("C-x b" . consult-buffer))
   :config
   (setq consult-fd-args '((if (executable-find "fdfind") "fdfind" "fd")
-                          "--color=never --full-path")
+                          "--color=never")
         consult-async-min-input my/consult-async-min-input
         consult-async-refresh-delay my/consult-async-delay
         consult-async-input-debounce my/consult-async-debounce
@@ -107,7 +107,16 @@
   (setq neo-theme 'nerd-icons
         neo-window-width 30
         neo-smart-open t
-        neo-show-hidden-files t))
+        neo-show-hidden-files t
+        neo-autorefresh t)
+  (defun my/neotree-project-toggle ()
+    "Toggle neotree at project root, or default-directory if no project."
+    (interactive)
+    (if (neo-global--window-exists-p)
+        (neotree-hide)
+      (neotree-dir (if-let ((proj (project-current)))
+                       (project-root proj)
+                     default-directory)))))
 #+end_src
 
 * Indent Bars

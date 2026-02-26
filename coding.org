@@ -19,6 +19,7 @@
     (setq vterm-module-cmake-args "-DUSE_SYSTEM_LIBVTERM=yes"))
   (dolist (key '("C-c" "C-u" "C-y" "C-z"))
     (define-key vterm-mode-map (kbd key) #'vterm--self-insert))
+  (define-key vterm-mode-map (kbd "C-SPC") leader-map)
   (define-key vterm-mode-map (kbd "C-S-v") #'my/clipboard-paste)
   (define-key vterm-mode-map (kbd "M-SPC") #'vterm)
   (with-eval-after-load 'evil
@@ -80,9 +81,17 @@
   (diff-hl-flydiff-mode 1))
 #+end_src
 
+* Magent
+#+begin_src emacs-lisp
+(use-package magent
+  :load-path "~/magent"
+  :commands (magent)
+  :hook (after-init . magent))
+#+end_src
+
 * Eglot
 #+begin_src emacs-lisp
-(setq project-vc-extra-root-markers '("go.mod" "Cargo.toml" "package.json" "pyproject.toml"))
+(setq project-vc-extra-root-markers '(".project" "go.mod" "Cargo.toml" "package.json" "pyproject.toml"))
 
 (add-hook 'eglot-managed-mode-hook #'eglot-inlay-hints-mode)
 (add-hook 'eglot-managed-mode-hook #'flymake-mode)

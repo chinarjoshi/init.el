@@ -147,6 +147,12 @@ p10k-style git status in echo area.
   (my/load-modules)
   (kill-emacs))
 
+(defun my/switch-project ()
+  "Switch project with substring matching instead of fuzzy."
+  (interactive)
+  (let ((completion-styles '(basic substring)))
+    (project-switch-project)))
+
 (defun my/magit-status ()
   (interactive)
   (if (project-current)
@@ -156,7 +162,15 @@ p10k-style git status in echo area.
 (defun my/find-home ()
   (interactive)
   (let ((default-directory "~/")
-        (consult-fd-args (append consult-fd-args '("-H"))))
+        (vertico-count 5)
+        (consult-fd-args '((if (executable-find "fdfind") "fdfind" "fd")
+                          "--color=never -H -d 4"
+                          "-E .git -E .cache -E .local -E .cargo -E .Trash"
+                          "-E .nix-defexpr -E .nix-profile -E .npm -E .nvm"
+                          "-E .pyenv -E .conda -E .bun -E .docker -E .ollama"
+                          "-E Library -E Applications -E Movies -E Music"
+                          "-E Pictures -E Public -E Documents -E Downloads"
+                          "-E node_modules -E elpa -E eln-cache -E go -E .vscode")))
     (consult-fd)))
 
 (defun my/edit-config ()
@@ -181,14 +195,14 @@ p10k-style git status in echo area.
   ","   #'consult-buffer
   "."   #'my/find-home
   "/"   #'consult-ripgrep
-  ";"   #'neotree-toggle
+  ";"   #'my/neotree-project-toggle
   "?"   #'execute-extended-command
   "SPC" #'my/magit-status
   "C"   #'comment-line
   "D"   #'flymake-show-project-diagnostics
   "E"   #'my/edit-config
   "F"   #'find-file
-  "P"   #'project-switch-project
+  "P"   #'my/switch-project
   "R"   #'my/replace-from-clipboard
   "S"   #'xref-find-apropos
   "a"   #'eglot-code-actions
